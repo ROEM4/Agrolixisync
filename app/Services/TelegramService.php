@@ -1,0 +1,98 @@
+<?php
+ 
+namespace App\Services;
+ 
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+ 
+class TelegramService
+{
+    protected $token;
+    protected $chatId;
+ 
+    public function __construct()
+    {
+        $this->token = config('services.telegram.bot_token') ?? env('TELEGRAM_BOT_TOKEN');
+        $this->chatId = config('services.telegram.chat_id') ?? env('TELEGRAM_CHAT_ID');
+    }
+ 
+    /**
+     * Enviar mensaje genérico a Telegram
+     */
+    public function sendMessage(string $message, string $parseMode = 'HTML'): bool
+    {
+        if (!$this->token || !$this->chatId) {
+            Log::warning('Telegram Service: Configuración incompleta (Falta TOKEN o CHAT_ID)');
+            return false;
+        }
+ 
+        try {
+            $response = Http::withoutVerifying()->post("https://api.telegram.org/bot{$this->token}/sendMessage", [
+                'chat_id' => $this->chatId,
+                'text' => $message,
+                'parse_mode' => $parseMode,
+                'disable_web_page_preview' => true,
+            ]);
+ 
+            if (!$response->successful()) {
+                Log::error('Telegram Service Error: ' . $response->status() . ' - ' . $response->body());
+                return false;
+            }
+ 
+            return true;
+        } catch (\Exception $e) {
+            Log::error('Telegram Service Exception: ' . $e->getMessage());
+            return false;
+        }
+    }
+ 
+    /**
+     * Envía una alerta de lixiviación estructurada
+     */
+    public function sendAlert($alert, bool $isUpdate = false): bool
+    {
+        $loteName = $alert->location->lote->name ?? 'N/A';
+        $locationName = $alert->location->name ?? 'N/A';
+        $level = strtoupper($alert->severity ?? $alert->level ?? 'BAJO');
+ 
+        $emoji = '🟢';
+        if (in_array($level, ['ALTO', 'CRÍTICO'])) $emoji = '🔴';
+        elseif ($level === 'MEDIO') $emoji = '🟠';
+ 
+        $duration = "";
+        if ($isUpdate && $alert->tiempo_riesgo) {
+            $diff = now()->diffInMinutes($alert->tiempo_riesgo);
+            $duration = " (⚠️ PERSISTE: {$diff} min)";
+        }
+ 
+        $trend = "";
+        if ($alert->ce_actual && $alert->ce_anterior) {
+            $diff = $alert->ce_actual - $alert->ce_anterior;
+            $trendEmoji = $diff > 0 ? '📈' : ($diff < 0 ? '📉' : '➡️');
+            $trend = "\n{$trendEmoji} <b>Tendencia CE:</b> " . ($diff > 0 ? '+' : '') . number_format($diff, 4) . " dS/m";
+        }
+ 
+        $title = $isUpdate ? "🔄 <b>ACTUALIZACIÓN DE ALERTA</b>" : "{$emoji} <b>ALERTA DE LIXIVIACIÓN</b>";
+        
+        $msg = "{$title}\n"
+             . "───────────────────\n"
+             . "📍 <b>Lote:</b> {$loteName}\n"
+             . "📍 <b>Ubicación:</b> {$locationName}\n"
+             . "⚠️ <b>Nivel de Riesgo:</b> <code>{$level}</code>{$duration}\n"
+             . "───────────────────\n"
+             . "📊 <b>Métricas de Control:</b>\n"
+             . "• <b>CE Actual:</b> " . number_format($alert->ce_actual ?? 0, 4) . " dS/m"
+             . ($trend ?: "") . "\n"
+             . "• <b>Δ CE (S-P):</b> " . number_format($alert->delta_ce ?? 0, 4) . " dS/m\n"
+             . "• <b>Tiempo (TAR):</b> " . ($alert->tar ?? '--') . " seg\n"
+             . "───────────────────\n"
+             . "📝 <b>Detalle Técnico:</b>\n"
+             . "<i>" . ($alert->description ?? 'Detección automática por sistema de monitoreo.') . "</i>\n\n"
+             . "💡 <b>Recomendación:</b>\n"
+             . "<b>" . ($alert->recommendation ?? 'Revisar sistema de riego y drenaje.') . "</b>\n"
+             . "───────────────────\n"
+             . "📅 <i>Generado el: " . now()->format('d/m/Y H:i:s') . "</i>";
+ 
+        return $this->sendMessage($msg);
+    }
+}

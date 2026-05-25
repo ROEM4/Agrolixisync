@@ -1,0 +1,114 @@
+@extends('layouts.app')
+
+@section('content')
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+    <!-- Tarjeta Conductividad -->
+    <div class="bg-white p-6 rounded-lg shadow-lg border-l-4 border-blue-500">
+        <h2 class="text-gray-500 text-sm uppercase font-bold mb-2">Conductividad Eléctrica (EC)</h2>
+        <div class="flex items-center">
+            <span class="text-4xl font-bold text-gray-800">{{ $latest ? $latest->value : 'N/A' }}</span>
+            <span class="ml-2 text-gray-600">dS/m</span>
+        </div>
+        <p class="text-xs text-gray-400 mt-2">Última lectura: {{ $latest ? $latest->created_at->diffForHumans() : '-' }}</p>
+    </div>
+
+    <!-- Tarjeta Humedad -->
+    <div class="bg-white p-6 rounded-lg shadow-lg border-l-4 border-green-500">
+        <h2 class="text-gray-500 text-sm uppercase font-bold mb-2">Humedad del Suelo</h2>
+        <div class="flex items-center">
+            <span class="text-4xl font-bold text-gray-800">{{ $latest ? $latest->humidity : 'N/A' }}</span>
+            <span class="ml-2 text-gray-600">%</span>
+        </div>
+        <p class="text-xs text-gray-400 mt-2">Estado: {{ ($latest && $latest->humidity < 30) ? 'Riego Requerido' : 'Óptimo' }}</p>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    <!-- Gráfico EC -->
+    <div class="bg-white p-4 rounded-lg shadow-lg">
+        <h3 class="font-bold text-gray-700 mb-4">Tendencia de Conductividad</h3>
+        <canvas id="chartEc"></canvas>
+    </div>
+    <!-- Gráfico Humedad -->
+    <div class="bg-white p-4 rounded-lg shadow-lg">
+        <h3 class="font-bold text-gray-700 mb-4">Tendencia de Humedad</h3>
+        <canvas id="chartHumidity"></canvas>
+    </div>
+</div>
+
+<!-- Tabla Historial -->
+<div class="bg-white rounded-lg shadow-lg overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+        <h3 class="font-bold text-gray-700">Historial de Lecturas (Recientes)</h3>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+            <thead class="bg-gray-100">
+                <tr>
+                    <th class="px-6 py-3 text-left font-medium text-gray-600">Fecha / Hora</th>
+                    <th class="px-6 py-3 text-left font-medium text-gray-600">Conductividad (dS/m)</th>
+                    <th class="px-6 py-3 text-left font-medium text-gray-600">Humedad (%)</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                @forelse($readings->sortByDesc('created_at') as $reading)
+                <tr>
+                    <td class="px-6 py-3 text-gray-700">{{ $reading->created_at->format('d/m/Y H:i') }}</td>
+                    <td class="px-6 py-3 text-gray-700 font-bold text-blue-600">{{ $reading->value }}</td>
+                    <td class="px-6 py-3 text-gray-700 font-bold text-green-600">{{ $reading->humidity }}%</td>
+                </tr>
+                @empty
+                <tr>
+                    <td colspan="3" class="px-6 py-3 text-center text-gray-500">No hay registros aún.</td>
+                </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // Preparar datos desde Laravel
+    const rawData = @json($readings);
+    
+    // Extraer etiquetas (fechas) y valores
+    const labels = rawData.map(data => {
+        const date = new Date(data.created_at);
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    });
+    const ecData = rawData.map(data => data.value);
+    const humData = rawData.map(data => data.humidity);
+
+    // Configuración Gráfico EC
+    new Chart(document.getElementById('chartEc'), {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'EC (dS/m)',
+                data: ecData,
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                fill: true,
+                tension: 0.3
+            }]
+        }
+    });
+
+    // Configuración Gráfico Humedad
+    new Chart(document.getElementById('chartHumidity'), {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Humedad (%)',
+                data: humData,
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                fill: true,
+                tension: 0.3
+            }]
+        }
+    });
+</script>
+@endsection
