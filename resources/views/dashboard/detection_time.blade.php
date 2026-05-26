@@ -252,21 +252,24 @@
         <table class="w-full">
             <thead>
                 <tr>
-                    <th class="px-6 py-4">Número</th>
+                    <th class="px-6 py-4">Día</th>
                     <th class="px-6 py-4">Fecha</th>
                     <th class="px-6 py-4">Tiempo Inicial (Ti)</th>
                     <th class="px-6 py-4">Tiempo Final (Tf)</th>
                     <th class="px-6 py-4">Subparcela</th>
                     <th class="px-6 py-4">Tiempo Promedio</th>
-                    <th class="px-6 py-4">Eventos</th>
+                    <th class="px-6 py-4 text-center font-medium">Eventos Acumulados</th>
                 </tr>
             </thead>
             <tbody id="detection-body">
                 @if(count($detectionRecords->items()) > 0)
-                    @foreach($detectionRecords->items() as $day)
+                    @php $cumulativeEventCount = 0; @endphp
+                    @foreach($detectionRecords->items() as $index => $day)
                         <tr>
                             <td>
-                                <div style="font-weight: 700; color: #374151;">{{ $day['numero'] }}</div>
+                                <div style="font-weight: 700; color: #374151;">
+                                    {{ $detectionRecords->total() - ($detectionRecords->firstItem() + $index) + 1 }}
+                                </div>
                             </td>
                             <td>
                                 <div style="font-weight: 700; color: #1a472a;">{{ \Carbon\Carbon::parse($day['fecha'])->format('d/m/Y') }}</div>
@@ -289,7 +292,8 @@
                                 </div>
                             </td>
                             <td>
-                                <div style="font-weight: 700; color: #3b82f6;">{{ $day['cantidad_eventos'] }}</div>
+                                @php $cumulativeEventCount += $day['cantidad_eventos']; @endphp
+                                <div class="px-6 py-4 text-center font-medium">{{ $cumulativeEventCount }}</div>
                             </td>
                         </tr>
                     @endforeach
@@ -354,6 +358,11 @@
                         @endif
                     @endforeach
                 </select>
+            </div>
+            <div style="margin-bottom: 1.25rem;">
+                <label style="font-size: 0.75rem; font-weight: 700; color: #9ca3af; text-transform: uppercase; margin-bottom: 0.5rem; display: block;">Subparcela (ej: S1, S2, S3...)</label>
+                <input type="text" name="subparcela" value="{{ old('subparcela') }}" required placeholder="ej: S1" pattern="[Ss]\d+" title="Debe usar la letra 'S' seguida de un número (ej. S1, S2)" style="width: 100%; padding: 0.6rem 0.8rem; border: 1px solid #e5e7eb; border-radius: 10px; font-size: 0.85rem; background: #fff; outline: none;">
+                @error('subparcela') <div class="error">{{ $message }}</div> @enderror
             </div>
             <div style="margin-bottom: 1.25rem;">
                 <label style="font-size: 0.75rem; font-weight: 700; color: #9ca3af; text-transform: uppercase; margin-bottom: 0.5rem; display: block;">Fecha del Evento</label>

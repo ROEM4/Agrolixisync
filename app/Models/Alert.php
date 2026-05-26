@@ -30,6 +30,7 @@ class Alert extends Model
         'tar',
         'notified',
         'notified_at',
+        'subparcela',
     ];
 
     protected $casts = [

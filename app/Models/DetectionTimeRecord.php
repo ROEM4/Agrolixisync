@@ -20,6 +20,7 @@ class DetectionTimeRecord extends Model
         'cantidad_eventos',
         'suma_tiempos_segundos',
         'tipo_entrada',
+        'subparcela',
     ];
 
     protected $casts = [
@@ -105,7 +106,7 @@ class DetectionTimeRecord extends Model
      */
     public function getSubparcelaAttribute()
     {
-        return $this->location ? $this->location->name : 'N/A';
+        return !empty($this->attributes['subparcela']) ? $this->attributes['subparcela'] : ($this->location ? $this->location->name : 'N/A');
     }
 
     /**

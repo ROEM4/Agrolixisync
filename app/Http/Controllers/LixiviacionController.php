@@ -7,6 +7,8 @@ use App\Models\Location;
 use App\Models\Reading;
 use App\Models\PFRecord;
 use App\Models\Analysis;
+use App\Models\Alert;
+use App\Models\Observacion;
 use Carbon\Carbon;
 
 class LixiviacionController extends Controller
@@ -136,5 +138,102 @@ class LixiviacionController extends Controller
         };
 
         return response()->stream($callback, 200, $headers);
+    }
+
+    public function storeManual(Request $request)
+    {
+        $request->validate([
+            'location_id' => 'required|exists:locations,id',
+            'conductivity_superficial' => 'required|numeric|min:0',
+            'conductivity_profundo' => 'required|numeric|min:0',
+        ]);
+
+        $location = Location::findOrFail($request->location_id);
+        $ce_s = (float) $request->conductivity_superficial;
+        $ce_p = (float) $request->conductivity_profundo;
+        
+        // Calcular ILx
+        $ilx = $ce_s > 0 ? round($ce_p / $ce_s, 4) : 0.0;
+        $delta = round($ce_s - $ce_p, 4);
+
+        // Clasificar ILx
+        $ilx_estado = 'EQUILIBRIO';
+        $detected = false;
+        $risk = 'BAJO';
+
+        if ($ilx > 1.20) {
+            $ilx_estado = 'LIXIVIACIÓN ALTA';
+            $detected = true;
+            $risk = 'ALTO';
+        } elseif ($ilx > 1.05) {
+            $ilx_estado = 'LIXIVIACIÓN';
+            $detected = true;
+            $risk = 'MEDIO';
+        } elseif ($ilx >= 0.90) {
+            $ilx_estado = 'EQUILIBRIO';
+            $detected = false;
+            $risk = 'BAJO';
+        } elseif ($ilx >= 0.70) {
+            $ilx_estado = 'RETENCIÓN';
+            $detected = false;
+            $risk = 'BAJO';
+        } else {
+            $ilx_estado = 'ACUMULACIÓN';
+            $detected = true;
+            $risk = 'MEDIO';
+        }
+
+        $now = now();
+
+        $analysis = Analysis::create([
+            'lote_id'                  => $location->lote_id,
+            'location_id'              => $location->id,
+            'experimental_group'       => $location->experimental_group,
+            'conductivity_superficial' => $ce_s,
+            'conductivity_profundo'    => $ce_p,
+            'delta_conductivity'       => $delta,
+            'ilx'                      => $ilx,
+            'ilx_estado'               => $ilx_estado,
+            'lixiviation_detected'     => $detected,
+            'risk_level'               => $risk,
+            'threshold_used'           => 1.20,
+            'analyzed_at'              => $now,
+            'event_detected_at'        => $now,
+            'alert_generated_at'       => $detected ? $now : null,
+            'event_type'               => 'LIXIVIATION',
+        ]);
+
+        if ($detected || $risk === 'MEDIO') {
+            $alert = Alert::create([
+                'lote_id'       => $location->lote_id,
+                'location_id'   => $location->id,
+                'analysis_id'   => $analysis->id,
+                'type'          => 'lixiviacion',
+                'description'   => sprintf('Manual ILx=%.4f (%s) | ΔCE=%.4f dS/m', $ilx, $ilx_estado, $delta),
+                'severity'      => $risk,
+                'level'         => $risk,
+                'status'        => 'RESOLVED',
+                'is_resolved'   => true,
+                'resolved_at'   => $now,
+                'ce_actual'     => $ce_s,
+                'ce_anterior'   => $ce_s,
+                'delta_ce'      => 0.0,
+                'tiempo_riesgo' => $now,
+                'tiempo_alerta' => $now,
+            ]);
+
+            $observacion = new Observacion([
+                'location_id'        => $location->id,
+                'experimental_group' => $location->experimental_group,
+                'alert_id'           => $alert->id,
+                'ce_real'            => $ce_s,
+                'diagnostico'        => 'LIXIVIACION',
+                'resultado'          => 'VP',
+            ]);
+            $observacion->save();
+        }
+
+        return redirect()->route('lixiviacion', ['location_id' => $location->id])
+            ->with('success', 'Registro manual de lixiviación guardado correctamente.');
     }
 }

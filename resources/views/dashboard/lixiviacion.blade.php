@@ -134,6 +134,27 @@
         </div>
     </div>
 
+    @if(session('success'))
+        <div class="alert alert-success" style="background-color: #dcfce7; border: 1px solid #bbf7d0; color: #16a34a; padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 8px;">
+            <i class="fas fa-check-circle" style="font-size: 1.2rem;"></i>
+            <span style="font-weight: 600; font-size: 0.9rem;">{{ session('success') }}</span>
+        </div>
+    @endif
+
+    @if($errors->any())
+        <div class="alert alert-danger" style="background-color: #fee2e2; border: 1px solid #fecaca; color: #dc2626; padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 0.5rem; font-weight: 700; font-size: 0.9rem;">
+                <i class="fas fa-exclamation-circle" style="font-size: 1.2rem;"></i>
+                <span>Por favor corrige los siguientes errores:</span>
+            </div>
+            <ul style="margin: 0; padding-left: 1.5rem; font-size: 0.85rem; font-weight: 600;">
+                @foreach($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
     {{-- Controls Row --}}
     <div class="flex flex-col lg:flex-row gap-6 mb-10 items-end">
         <div class="flex-grow max-w-xl">
@@ -194,23 +215,25 @@
             </div>
 
             @if($isCtrl)
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <form action="{{ route('lixiviacion.store_manual') }}" method="POST" id="manual-lix-form" class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    @csrf
+                    <input type="hidden" name="location_id" value="{{ $location_id }}">
                     <div class="md:col-span-1">
                         <label class="block text-[10px] font-black text-amber-600 uppercase mb-2 tracking-widest">CE Superficial (dS/m)</label>
-                        <input type="number" step="0.001" id="manual-ce-sup" oninput="updateManualCards()"
-                               class="w-full p-4 bg-white border-2 border-amber-100 rounded-2xl font-black text-slate-700 outline-none focus:border-amber-500 transition-all shadow-inner" placeholder="0.000">
+                        <input type="number" step="0.001" name="conductivity_superficial" id="manual-ce-sup" oninput="updateManualCards()"
+                               class="w-full p-4 bg-white border-2 border-amber-100 rounded-2xl font-black text-slate-700 outline-none focus:border-amber-500 transition-all shadow-inner" placeholder="0.000" required>
                     </div>
                     <div class="md:col-span-1">
                         <label class="block text-[10px] font-black text-amber-600 uppercase mb-2 tracking-widest">CE Profunda (dS/m)</label>
-                        <input type="number" step="0.001" id="manual-ce-prof" oninput="updateManualCards()"
-                               class="w-full p-4 bg-white border-2 border-amber-100 rounded-2xl font-black text-slate-700 outline-none focus:border-amber-500 transition-all shadow-inner" placeholder="0.000">
+                        <input type="number" step="0.001" name="conductivity_profundo" id="manual-ce-prof" oninput="updateManualCards()"
+                               class="w-full p-4 bg-white border-2 border-amber-100 rounded-2xl font-black text-slate-700 outline-none focus:border-amber-500 transition-all shadow-inner" placeholder="0.000" required>
                     </div>
                     <div class="md:col-span-2 flex items-end">
-                        <button type="button" onclick="saveManualRecord()" class="w-full py-4 bg-amber-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-amber-200 hover:bg-amber-700 transform hover:-translate-y-1 transition-all flex items-center justify-center gap-3">
+                        <button type="submit" class="w-full py-4 bg-amber-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-amber-200 hover:bg-amber-700 transform hover:-translate-y-1 transition-all flex items-center justify-center gap-3">
                             <i class="fas fa-save"></i> GUARDAR REGISTRO MANUAL
                         </button>
                     </div>
-                </div>
+                </form>
             @endif
         </div>
     @endif
@@ -427,18 +450,6 @@ function updateManualCards() {
     const ilx  = (!isNaN(ce_s) && ce_s > 0 && !isNaN(ce_p)) ? ce_p / ce_s : NaN;
     updateCards(ce_s, ce_p, ilx);
     setConn('🟡 Modo Manual');
-}
-
-async function saveManualRecord() {
-    const ce_s = parseFloat(document.getElementById('manual-ce-sup')?.value);
-    const ce_p = parseFloat(document.getElementById('manual-ce-prof')?.value);
-    
-    if (isNaN(ce_s) || isNaN(ce_p)) {
-        alert('Por favor ingrese ambos valores de CE');
-        return;
-    }
-    alert('Registro guardado exitosamente (Simulado)');
-    location.reload();
 }
 
 if (locationId) {

@@ -66,6 +66,7 @@ Route::get('/lixiviacion/export', [\App\Http\Controllers\LixiviacionController::
 Route::get('/detection-time', [\App\Http\Controllers\DetectionTimeController::class, 'index'])->name('detection_time');
 Route::get('/detection-time/export', [\App\Http\Controllers\DetectionTimeController::class, 'export'])->name('detection_time.export');
 Route::post('/detection-time/manual', [\App\Http\Controllers\DetectionTimeController::class, 'storeManual'])->name('detection_time.store_manual');
+Route::post('/lixiviacion/manual', [\App\Http\Controllers\LixiviacionController::class, 'storeManual'])->name('lixiviacion.store_manual');
 
 // Ficha PF - registro y visualización
 Route::middleware([VerifiedAgricultor::class])->group(function () {

@@ -56,7 +56,7 @@ class DetectionTimeController extends Controller
         $totalAlertsCount = (clone $recordsQuery)->sum('cantidad_eventos');
 
         // Paginar los resultados usando el paginador estándar de Eloquent
-        $detectionRecords = $recordsQuery->paginate(20)->withQueryString();
+        $detectionRecords = $recordsQuery->paginate(15)->withQueryString();
 
         // Si no hay registros en detection_time_records pero sí existen alertas en la BD,
         // generar un fallback en memoria para garantizar que la vista no aparezca vacía.
@@ -270,7 +270,12 @@ class DetectionTimeController extends Controller
                     'lote_id' => $alert->lote_id,
                     'location' => $alert->location,
                     'alerts' => [],
+                    'subparcela' => $alert->subparcela,
                 ];
+            } else {
+                if (empty($groupedByDateAndLocation[$key]['subparcela']) && !empty($alert->subparcela)) {
+                    $groupedByDateAndLocation[$key]['subparcela'] = $alert->subparcela;
+                }
             }
 
             $diferencia = $alert->tiempo_riesgo->diffInSeconds($alert->tiempo_alerta);
@@ -299,6 +304,7 @@ class DetectionTimeController extends Controller
                     'cantidad_eventos' => count($record['alerts']),
                     'suma_tiempos_segundos' => (int)array_sum($record['alerts']),
                     'tipo_entrada' => $tipoEntrada,
+                    'subparcela' => $record['subparcela'],
                 ]
             );
         }
@@ -350,6 +356,7 @@ class DetectionTimeController extends Controller
             'fecha' => 'required|date',
             'hora_alerta' => 'required',
             'hora_evento' => 'required',
+            'subparcela' => ['required', 'string', 'regex:/^[Ss]\d+$/'],
         ]);
 
         $location = Location::findOrFail($request->location_id);
@@ -366,11 +373,35 @@ class DetectionTimeController extends Controller
 
         // Calcular diff en segundos
         $tarSeconds = $tf->diffInSeconds($ti);
+        $subparcelaVal = strtoupper($request->subparcela);
+
+        // Crear registro en la tabla analysis (Lixiviación) para mantener sincronización
+        $analysis = \App\Models\Analysis::create([
+            'lote_id'                  => $location->lote_id,
+            'location_id'              => $location->id,
+            'experimental_group'       => $location->experimental_group,
+            'conductivity_superficial' => 0.0,
+            'conductivity_profundo'    => 0.0,
+            'delta_conductivity'       => 0.0,
+            'ilx'                      => 1.1000,
+            'ilx_estado'               => 'LIXIVIACIÓN',
+            'lixiviation_detected'     => true,
+            'risk_level'               => 'MEDIO',
+            'threshold_used'           => 1.20,
+            'analyzed_at'              => $ti,
+            'event_detected_at'        => $ti,
+            'alert_generated_at'       => $ti,
+            'event_type'               => 'LIXIVIATION',
+            'is_validated'             => true,
+            'validated_at'             => $tf,
+            'notes'                    => 'Registro manual desde Tiempo de Detección',
+        ]);
 
         // Crear alerta manual
-        Alert::create([
+        $alert = Alert::create([
             'location_id'   => $location->id,
             'lote_id'       => $location->lote_id,
+            'analysis_id'   => $analysis->id,
             'type'          => 'lixiviacion',
             'severity'      => 'MEDIO',
             'level'         => 'medio',
@@ -381,7 +412,21 @@ class DetectionTimeController extends Controller
             'tiempo_alerta' => $ti,
             'tiempo_riesgo' => $tf,
             'tar'           => $tarSeconds,
+            'subparcela'    => $subparcelaVal,
         ]);
+
+        // Crear registro de observación (Análisis Académico) para mantener sincronización
+        $observacion = new \App\Models\Observacion([
+            'location_id'        => $location->id,
+            'experimental_group' => $location->experimental_group,
+            'alert_id'           => $alert->id,
+            'ce_real'            => 0.0,
+            'diagnostico'        => 'LIXIVIACION',
+            'resultado'          => 'VP',
+        ]);
+        $observacion->created_at = $ti;
+        $observacion->updated_at = $ti;
+        $observacion->save();
 
         return redirect()->route('detection_time', ['location_id' => $location->id])
             ->with('success', 'Registro de tiempo manual guardado correctamente.');
