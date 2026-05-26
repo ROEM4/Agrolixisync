@@ -181,7 +181,7 @@
                             {{ $isCtrl ? 'Entrada Manual — Grupo Control' : 'Monitoreo Automático — Grupo Experimental' }}
                         </h3>
                         <p class="text-sm font-medium {{ $isCtrl ? 'text-amber-600' : 'text-emerald-600' }}">
-                            {{ $isCtrl ? 'Ingrese las lecturas manuales del lisímetro.' : 'Datos recolectados por sensores IoT en tiempo real.' }}
+                            {{ $isCtrl ? 'Ingrese las lecturas manuales del conductimetro digital' : 'Datos recolectados por sensores IoT en tiempo real.' }}
                         </p>
                     </div>
                 </div>
