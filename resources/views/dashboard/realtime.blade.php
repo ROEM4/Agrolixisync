@@ -70,7 +70,7 @@
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4 bg-white p-4 md:px-6 rounded-xl shadow-sm border border-slate-100">
         <div>
             <h1 class="m-0 text-xl md:text-2xl font-black text-emerald-900 tracking-tight">AGROlixisync</h1>
-            <p class="m-0 text-xs md:text-sm text-slate-500 font-bold">Monitoreo de Lixiviación en AgrolixiSync</p>
+            <p class="m-0 text-xs md:text-sm text-slate-500 font-bold">Monito de Lixiviación en AgrolixiSync</p>
         </div>
         
         <div class="flex flex-wrap items-center gap-4 md:gap-8 w-full md:w-auto">
