@@ -278,6 +278,22 @@
         </div>
     </div>
 
+    {{-- Charts Block --}}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+        <div class="glass-card p-6">
+            <h4 class="kpi-title">CE Superficial — Promedio Diario</h4>
+            <div style="height:220px;"><canvas id="lxCeSupChart"></canvas></div>
+        </div>
+        <div class="glass-card p-6">
+            <h4 class="kpi-title">Índice de Lixiviación — Evolución</h4>
+            <div style="height:220px;"><canvas id="lxIlxChart"></canvas></div>
+        </div>
+        <div class="glass-card p-6">
+            <h4 class="kpi-title">Registros por Día</h4>
+            <div style="height:220px;"><canvas id="lxCountsChart"></canvas></div>
+        </div>
+    </div>
+
 
 
     {{-- Historical Analysis Table (Ficha de Registro IL) --}}
@@ -473,5 +489,31 @@ if (locationId) {
         }
     }
 }
+</script>
+@endpush
+
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    const dates = @json($datesJson ?? '[]');
+    const ceSup = @json($ceSupJson ?? '[]');
+    const ilx = @json($ilxJson ?? '[]');
+    const counts = @json($countsJson ?? '[]');
+
+    const parseDates = JSON.parse(dates);
+    const ceData = JSON.parse(ceSup);
+    const ilxData = JSON.parse(ilx);
+    const cntData = JSON.parse(counts);
+
+    const c1 = document.getElementById('lxCeSupChart');
+    if (c1) new Chart(c1, { type:'line', data:{ labels: parseDates, datasets:[{ label:'CE Superficial (dS/m)', data: ceData, borderColor:'#0ea5a0', backgroundColor:'rgba(14,165,160,0.05)', fill:true }]}, options:{ responsive:true, maintainAspectRatio:false } });
+
+    const c2 = document.getElementById('lxIlxChart');
+    if (c2) new Chart(c2, { type:'line', data:{ labels: parseDates, datasets:[{ label:'ILx (ratio)', data: ilxData, borderColor:'#6366f1', backgroundColor:'rgba(99,102,241,0.05)', fill:true }]}, options:{ responsive:true, maintainAspectRatio:false } });
+
+    const c3 = document.getElementById('lxCountsChart');
+    if (c3) new Chart(c3, { type:'bar', data:{ labels: parseDates, datasets:[{ label:'Registros', data: cntData, backgroundColor:'#4f46e5' }]}, options:{ responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true, stepSize:1 } } } });
+});
 </script>
 @endpush

@@ -1,0 +1,45 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Mockup - Análisis (Precisión)</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>body{font-family:Inter,Arial;margin:24px;background:#f8fafc;color:#0f172a} .card{background:#fff;padding:18px;border-radius:12px;box-shadow:0 6px 18px rgba(2,6,23,0.06);margin-bottom:18px}</style>
+</head>
+<body>
+  <h2>Mockup: Porcentaje de Precisión de Detección</h2>
+  <div class="card">
+    <canvas id="linePD" height="120"></canvas>
+  </div>
+  <div style="display:flex;gap:18px;flex-wrap:wrap">
+    <div class="card" style="flex:1;min-width:320px"><h4>Comparación por Sensor</h4><canvas id="barSensors"></canvas></div>
+    <div class="card" style="width:360px"><h4>Actual vs Umbral</h4><canvas id="dotTarget" height="120"></canvas></div>
+  </div>
+
+  <script>
+  // Mock data
+  const labels = ['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06','2026-07'];
+  const pd = [86,88,90,89,91,92,90];
+
+  new Chart(document.getElementById('linePD'), {
+    type: 'line',
+    data: { labels, datasets: [{ label: 'Precisión (%)', data: pd, borderColor:'#0ea5a4', backgroundColor:'rgba(14,165,164,0.08)', tension:0.2, fill:true, pointRadius:4 }] },
+    options: { responsive:true, plugins:{legend:{display:false},title:{display:true,text:'Evolución de Precisión (%)'}}, scales:{y:{suggestedMin:70,suggestedMax:100}} }
+  });
+
+  const sensors = ['S1','S2','S3','S4','S5'];
+  const vals = [88,92,85,90,91];
+  new Chart(document.getElementById('barSensors'), {
+    type: 'bar', data:{ labels: sensors, datasets:[{ label:'Precisión', data: vals, backgroundColor: ['#60a5fa','#34d399','#fbbf24','#60a5fa','#34d399'] }] },
+    options:{ plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true, suggestedMax:100}} }
+  });
+
+  // Dot plot simulated with scatter and vertical target line
+  const current = [{x:1,y:90}];
+  new Chart(document.getElementById('dotTarget'),{
+    type:'scatter', data:{ datasets:[{label:'Actual',data:current,backgroundColor:'#10b981',pointRadius:8}]},
+    options:{ scales:{x:{display:false}, y:{min:0,max:100}}, plugins:{legend:{display:false}, annotation:false }, title:{display:true,text:'Valor actual vs umbral (90%)'}, plugins:{}, }
+  });
+  </script>
+</body>
+</html>

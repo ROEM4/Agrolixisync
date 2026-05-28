@@ -218,6 +218,22 @@
     </div>
 </div>
 
+    {{-- Charts Block --}}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="glass-card p-6">
+            <h4 class="kpi-title">Evolución Tiempo Promedio</h4>
+            <div style="height:220px;"><canvas id="dtAvgTimeChart"></canvas></div>
+        </div>
+        <div class="glass-card p-6">
+            <h4 class="kpi-title">Eventos por Día</h4>
+            <div style="height:220px;"><canvas id="dtEventsChart"></canvas></div>
+        </div>
+        <div class="glass-card p-6">
+            <h4 class="kpi-title">Entradas: Manual vs Automático</h4>
+            <div style="height:220px; display:flex; align-items:center; justify-content:center;"><canvas id="dtManualAutoChart" style="max-width:260px;"></canvas></div>
+        </div>
+    </div>
+
 <div class="glass-card mb-12">
     <div class="filter-section rounded-t-2xl">
         <div class="filter-group">
@@ -258,12 +274,12 @@
                     <th class="px-6 py-4">Tiempo Final (Tf)</th>
                     <th class="px-6 py-4">Subparcela</th>
                     <th class="px-6 py-4">Tiempo Promedio</th>
-                    <th class="px-6 py-4 text-center font-medium">Eventos Acumulados</th>
+                    <th class="px-6 py-4 text-center font-medium">Eventos</th>
+                    <th class="px-6 py-4 text-center">Acciones</th>
                 </tr>
             </thead>
             <tbody id="detection-body">
                 @if(count($detectionRecords->items()) > 0)
-                    @php $cumulativeEventCount = 0; @endphp
                     @foreach($detectionRecords->items() as $index => $day)
                         <tr>
                             <td>
@@ -292,14 +308,21 @@
                                 </div>
                             </td>
                             <td>
-                                @php $cumulativeEventCount += $day['cantidad_eventos']; @endphp
-                                <div class="px-6 py-4 text-center font-medium">{{ $cumulativeEventCount }}</div>
+                                <div class="px-6 py-4 text-center font-medium">{{ $day['cantidad_eventos'] }}</div>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                @if(isset($day['tipo_entrada']) && $day['tipo_entrada'] === 'manual')
+                                    @php $recId = isset($day['id']) ? $day['id'] : $day['numero']; @endphp
+                                    <button onclick="openEditModal({{ $recId }}, '{{ $day['subparcela'] }}', '{{ $day['fecha'] }}', '{{ \Carbon\Carbon::parse($day['tiempo_inicial'])->format('H:i:s') }}', '{{ \Carbon\Carbon::parse($day['tiempo_final'])->format('H:i:s') }}')" class="text-blue-500 hover:text-blue-700" title="Modificar"><i class="fas fa-edit"></i></button>
+                                @else
+                                    <span class="text-gray-400" title="Registro automático no modificable">-</span>
+                                @endif
                             </td>
                         </tr>
                     @endforeach
                 @else
                     <tr>
-                        <td colspan="7" class="empty-state">
+                        <td colspan="8" class="empty-state">
                             <i class="fas fa-inbox"></i>
                             <p>No se encontraron registros de tiempo de detección con los filtros seleccionados.</p>
                         </td>
@@ -386,6 +409,43 @@
     </div>
 </div>
 
+<!-- Modal de Edición Manual -->
+<div id="modalEdit" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>✏️ Modificar TPD Manual</h2>
+            <button onclick="closeEditModal()" class="btn btn-link text-muted" style="padding:0; border: none; background: transparent; cursor: pointer; font-size: 1.25rem;"><i class="fas fa-times"></i></button>
+        </div>
+        <form action="#" method="POST" id="edit-form">
+            @csrf
+            @method('PUT')
+            <input type="hidden" name="record_id" id="edit-record-id">
+            <div style="margin-bottom: 1.25rem;">
+                <label style="font-size: 0.75rem; font-weight: 700; color: #9ca3af; text-transform: uppercase; margin-bottom: 0.5rem; display: block;">Subparcela</label>
+                <input type="text" name="subparcela" id="edit-subparcela" required pattern="[Ss]\d+" style="width: 100%; padding: 0.6rem 0.8rem; border: 1px solid #e5e7eb; border-radius: 10px; font-size: 0.85rem; background: #fff; outline: none;">
+            </div>
+            <div style="margin-bottom: 1.25rem;">
+                <label style="font-size: 0.75rem; font-weight: 700; color: #9ca3af; text-transform: uppercase; margin-bottom: 0.5rem; display: block;">Fecha del Evento</label>
+                <input type="date" name="fecha" id="edit-fecha" required style="width: 100%; padding: 0.6rem 0.8rem; border: 1px solid #e5e7eb; border-radius: 10px; font-size: 0.85rem; background: #fff; outline: none;">
+            </div>
+            <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
+                <div style="flex: 1;">
+                    <label style="font-size: 0.75rem; font-weight: 700; color: #9ca3af; text-transform: uppercase; margin-bottom: 0.5rem; display: block;">Hora de Alerta (Ti)</label>
+                    <input type="time" step="1" name="hora_alerta" id="edit-ti" required style="width: 100%; padding: 0.6rem 0.8rem; border: 1px solid #e5e7eb; border-radius: 10px; font-size: 0.85rem; background: #fff; outline: none;">
+                </div>
+                <div style="flex: 1;">
+                    <label style="font-size: 0.75rem; font-weight: 700; color: #9ca3af; text-transform: uppercase; margin-bottom: 0.5rem; display: block;">Hora de Evento (Tf)</label>
+                    <input type="time" step="1" name="hora_evento" id="edit-tf" required style="width: 100%; padding: 0.6rem 0.8rem; border: 1px solid #e5e7eb; border-radius: 10px; font-size: 0.85rem; background: #fff; outline: none;">
+                </div>
+            </div>
+            <div style="margin-top: 2rem; display: flex; gap: 10px;">
+                <button type="submit" class="btn btn-primary" style="flex: 1; border-radius: 12px; font-weight: 700; padding: 0.75rem; background: var(--accent-blue); color: white; border: none; cursor: pointer;">Actualizar Registro</button>
+                <button type="button" onclick="closeEditModal()" class="btn btn-light" style="flex: 1; border-radius: 12px; font-weight: 700; padding: 0.75rem; cursor: pointer; border: 1px solid #e5e7eb; background: #fff; color: #374151;">Cancelar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 @endsection
 
 @push('scripts')
@@ -410,5 +470,62 @@ function openManualModal() {
 function closeManualModal() {
     document.getElementById('modalManual').style.display = 'none';
 }
+
+function openEditModal(id, subparcela, fecha, ti, tf) {
+    document.getElementById('edit-record-id').value = id;
+    document.getElementById('edit-subparcela').value = subparcela;
+    
+    // Parse the date (yyyy-mm-dd format expected for date input)
+    let d = new Date(fecha);
+    let dateString = d.toISOString().split('T')[0];
+    document.getElementById('edit-fecha').value = dateString;
+    
+    document.getElementById('edit-ti').value = ti;
+    document.getElementById('edit-tf').value = tf;
+    
+    // Note: To make this functional backend-wise, set form action here
+    // document.getElementById('edit-form').action = '/detection-time/manual/' + id;
+    
+    document.getElementById('modalEdit').style.display = 'flex';
+}
+
+function closeEditModal() {
+    document.getElementById('modalEdit').style.display = 'none';
+}
 </script>
 @endpush
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    const dates = @json($datesJson ?? '[]');
+    const avgTimes = @json($avgTimesJson ?? '[]');
+    const events = @json($eventsJson ?? '[]');
+    const manual = {{ $manualCount ?? 0 }};
+    const automatic = {{ $automaticCount ?? 0 }};
+
+    // Avg Time Line
+    const ctx1 = document.getElementById('dtAvgTimeChart');
+    if (ctx1) new Chart(ctx1, {
+        type: 'line',
+        data: { labels: JSON.parse(dates), datasets: [{ label: 'Tiempo promedio (s)', data: JSON.parse(avgTimes), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.05)', fill:true, tension:0.25 }] },
+        options: { responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true } } }
+    });
+
+    // Events Bar
+    const ctx2 = document.getElementById('dtEventsChart');
+    if (ctx2) new Chart(ctx2, {
+        type: 'bar',
+        data: { labels: JSON.parse(dates), datasets: [{ label: 'Eventos', data: JSON.parse(events), backgroundColor:'#3b82f6' }] },
+        options: { responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true, stepSize:1 } } }
+    });
+
+    // Manual vs Auto Doughnut
+    const ctx3 = document.getElementById('dtManualAutoChart');
+    if (ctx3) new Chart(ctx3, {
+        type: 'doughnut',
+        data: { labels:['Manual','Automático'], datasets:[{ data:[manual, automatic], backgroundColor:['#f59e0b','#64748b'] }] },
+        options: { responsive:true, maintainAspectRatio:false, cutout:'60%' }
+    });
+});
+</script>

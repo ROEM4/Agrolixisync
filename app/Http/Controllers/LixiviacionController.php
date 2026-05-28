@@ -81,6 +81,31 @@ class LixiviacionController extends Controller
 
         $selectedLocation = $location_id ? Location::find($location_id) : null;
 
+        // Preparar series para gráficos a partir de Analysis (agrupado por fecha)
+        $chartQuery = \App\Models\Analysis::query()->orderBy('analyzed_at');
+        if ($location_id) {
+            $chartQuery->where('location_id', $location_id);
+        }
+        switch ($filter) {
+            case '24h': $chartQuery->where('analyzed_at', '>=', Carbon::now()->subHours(24)); break;
+            case '7d':  $chartQuery->where('analyzed_at', '>=', Carbon::now()->subDays(7)); break;
+            case '14d': $chartQuery->where('analyzed_at', '>=', Carbon::now()->subDays(14)); break;
+            case '30d': $chartQuery->where('analyzed_at', '>=', Carbon::now()->subDays(30)); break;
+            case 'all': break;
+        }
+
+        $chartRows = $chartQuery->get()->groupBy(function($r){ return $r->analyzed_at->format('Y-m-d'); });
+        $dates = [];
+        $avgCeSup = [];
+        $avgIlx = [];
+        $counts = [];
+        foreach ($chartRows as $date => $rows) {
+            $dates[] = Carbon::parse($date)->format('d/m/Y');
+            $avgCeSup[] = round($rows->avg('conductivity_superficial'), 3);
+            $avgIlx[] = round($rows->avg('ilx'), 4);
+            $counts[] = $rows->count();
+        }
+
         return view('dashboard.lixiviacion', compact(
             'locations', 
             'analysisRecords', 
@@ -90,7 +115,12 @@ class LixiviacionController extends Controller
             'latestReading',
             'records',
             'selectedLocation'
-        ));
+        ))->with([
+            'datesJson' => json_encode($dates),
+            'ceSupJson' => json_encode($avgCeSup),
+            'ilxJson' => json_encode($avgIlx),
+            'countsJson' => json_encode($counts),
+        ]);
     }
 
     public function export(Request $request)

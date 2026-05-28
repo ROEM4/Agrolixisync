@@ -16,7 +16,7 @@ class DetectionTimeController extends Controller
     public function index(Request $request)
     {
         $location_id = $request->query('location_id');
-        $filter = $request->query('filter', '30d');
+        $filter = $request->query('filter', 'all');
         $locations = Location::with('lote')->orderBy('name')->get();
 
         // Sincronizar todas las alertas de la base de datos en la tabla detection_time_records (procesamiento automático)
@@ -105,6 +105,28 @@ class DetectionTimeController extends Controller
 
         $selectedLocation = $location_id ? Location::find($location_id) : null;
 
+        // Preparar series para Chart.js (consultando DetectionTimeRecord con mismos filtros)
+        $chartQuery = \App\Models\DetectionTimeRecord::query()->orderBy('fecha');
+        if ($location_id) {
+            $chartQuery->where('location_id', $location_id);
+        }
+        switch ($filter) {
+            case '24h': $chartQuery->where('fecha', '>=', Carbon::today()); break;
+            case '7d':  $chartQuery->where('fecha', '>=', Carbon::today()->subDays(7)); break;
+            case '14d': $chartQuery->where('fecha', '>=', Carbon::today()->subDays(14)); break;
+            case '30d': $chartQuery->where('fecha', '>=', Carbon::today()->subDays(30)); break;
+            case 'all': break;
+        }
+
+        $chartRows = $chartQuery->get();
+        $dates = $chartRows->map(fn($r) => $r->fecha->format('d/m/Y'))->toArray();
+        $avgTimes = $chartRows->map(fn($r) => (float) $r->tiempo_promedio_segundos)->toArray();
+        $events = $chartRows->map(fn($r) => (int) $r->cantidad_eventos)->toArray();
+
+        // Manual vs Automatic counts
+        $manualCount = $chartRows->where('tipo_entrada', 'manual')->count();
+        $automaticCount = $chartRows->where('tipo_entrada', 'automatico')->count();
+
         return view('dashboard.detection_time', [
             'locations' => $locations,
             'location_id' => $location_id,
@@ -113,6 +135,11 @@ class DetectionTimeController extends Controller
             'filter' => $filter,
             'total_alerts' => $totalAlertsCount,
             'unique_days' => $detectionRecords->total(),
+            'datesJson' => json_encode($dates),
+            'avgTimesJson' => json_encode($avgTimes),
+            'eventsJson' => json_encode($events),
+            'manualCount' => $manualCount,
+            'automaticCount' => $automaticCount,
         ]);
     }
 
@@ -140,8 +167,8 @@ class DetectionTimeController extends Controller
                 ];
             }
 
-            // Calcular diferencia en segundos (Tf - Ti)
-            $diferencia = $alert->tiempo_riesgo->diffInSeconds($alert->tiempo_alerta);
+            // Calcular diferencia en segundos (Tf - Ti), siempre positivo
+            $diferencia = abs($alert->tiempo_riesgo->diffInSeconds($alert->tiempo_alerta));
 
             $groupedByDate[$date]['alerts'][] = [
                 'id' => $alert->id,
@@ -278,7 +305,7 @@ class DetectionTimeController extends Controller
                 }
             }
 
-            $diferencia = $alert->tiempo_riesgo->diffInSeconds($alert->tiempo_alerta);
+            $diferencia = abs($alert->tiempo_riesgo->diffInSeconds($alert->tiempo_alerta));
             $groupedByDateAndLocation[$key]['alerts'][] = $diferencia;
         }
 

@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Mockup - Índice de Lixiviación</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>body{font-family:Inter,Arial;margin:24px;background:#f8fafc;color:#0f172a} .card{background:#fff;padding:18px;border-radius:12px;box-shadow:0 6px 18px rgba(2,6,23,0.06);margin-bottom:18px}</style>
+</head>
+<body>
+  <h2>Mockup: Índice de Lixiviación</h2>
+  <div class="card">
+    <h4>ILx por Ubicación (colores por severidad)</h4>
+    <canvas id="barILx" height="120"></canvas>
+  </div>
+  <div class="card" style="display:flex;gap:12px;align-items:center">
+    <div style="flex:1"><h4>Mapa (placeholder)</h4><div style="height:160px;border-radius:8px;background:linear-gradient(90deg,#e6f4ea,#f0f9ff);display:flex;align-items:center;justify-content:center;color:#6b7280">Mapa/GeoPlaceholder</div></div>
+    <div style="width:320px"><h4>Small Multiples (últimos 3 periodos)</h4><canvas id="smallMulti" height="120"></canvas></div>
+  </div>
+
+  <script>
+  const locs = ['Lote A','Lote B','Lote C','Lote D','Lote E'];
+  const ilx = [0.82,1.12,0.95,1.30,0.76];
+  const colors = ilx.map(v => v>1.20 ? '#ef4444' : (v>1.05 ? '#f59e0b' : (v>=0.9 ? '#10b981' : '#60a5fa')));
+
+  new Chart(document.getElementById('barILx'), {
+    type: 'bar', data: { labels: locs, datasets: [{ label:'ILx', data: ilx, backgroundColor: colors }] },
+    options: { plugins:{legend:{display:false},title:{display:false}}, scales:{y:{beginAtZero:true}} }
+  });
+
+  // small multiples simulated as stacked bar per periodo
+  new Chart(document.getElementById('smallMulti'), {
+    type:'bar', data:{ labels: ['Lote A','Lote B','Lote C','Lote D','Lote E'], datasets:[ {label:'7d',data:[0.8,1.1,0.9,1.2,0.75], backgroundColor:'#c7f9e6' }, {label:'14d',data:[0.82,1.12,0.95,1.3,0.76], backgroundColor:'#a7f3d0' } ] },
+    options:{ plugins:{title:{display:false}}, scales:{y:{beginAtZero:true}} }
+  });
+  </script>
+</body>
+</html>
