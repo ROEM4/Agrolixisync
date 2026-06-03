@@ -239,7 +239,6 @@
         <div class="filter-group">
             <label>Ubicación / Subparcela</label>
             <select id="f-location" onchange="changeFilter('location')">
-                <option value="">Todas las ubicaciones</option>
                 @foreach($locations as $loc)
                     @if(in_array($loc->id, [3, 4]))
                     <option value="{{ $loc->id }}" {{ $location_id == $loc->id ? 'selected' : '' }}>

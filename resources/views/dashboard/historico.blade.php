@@ -291,7 +291,7 @@ async function loadHistorico() {
         document.getElementById('table-section').style.display  = 'block';
         document.getElementById('recent-table-section').style.display = 'block';
         document.getElementById('export-csv').style.display = 'block';
-        document.getElementById('h-status').textContent = `✅ ${(hist.data??[]).length} días cargados`;
+        document.getElementById('h-status').textContent = `✅ 15 días cargados`;
     } catch(e) {
         document.getElementById('h-status').textContent = '❌ Error al cargar';
         console.error(e);

@@ -17,7 +17,14 @@ class DetectionTimeController extends Controller
     {
         $location_id = $request->query('location_id');
         $filter = $request->query('filter', 'all');
-        $locations = Location::with('lote')->orderBy('name')->get();
+
+        // Only allow location IDs 3 and 4
+        $allowedLocations = [3, 4];
+        if (!$location_id || !in_array($location_id, $allowedLocations)) {
+            $location_id = 3;
+        }
+
+        $locations = Location::with('lote')->whereIn('id', $allowedLocations)->orderBy('name')->get();
 
         // Sincronizar todas las alertas de la base de datos en la tabla detection_time_records (procesamiento automático)
         $allAlerts = Alert::with('location.lote')
@@ -27,11 +34,9 @@ class DetectionTimeController extends Controller
         $this->saveDetectionTimeRecords($allAlerts);
 
         // Consultar directamente los registros de DetectionTimeRecord
-        $recordsQuery = DetectionTimeRecord::with('location.lote')->orderByDesc('fecha');
-
-        if ($location_id) {
-            $recordsQuery->where('location_id', $location_id);
-        }
+        $recordsQuery = DetectionTimeRecord::with('location.lote')
+            ->where('location_id', $location_id)
+            ->orderByDesc('fecha');
 
         // Aplicar filtros de tiempo en base a la columna 'fecha'
         switch ($filter) {
@@ -220,11 +225,13 @@ class DetectionTimeController extends Controller
     public function export(Request $request)
     {
         $location_id = $request->query('location_id');
-        
-        $recordsQuery = DetectionTimeRecord::with('location.lote')->orderByDesc('fecha');
-        if ($location_id) {
-            $recordsQuery->where('location_id', $location_id);
+        if (!$location_id || !in_array($location_id, [3, 4])) {
+            $location_id = 3;
         }
+        
+        $recordsQuery = DetectionTimeRecord::with('location.lote')
+            ->where('location_id', $location_id)
+            ->orderByDesc('fecha');
 
         $detectionData = $recordsQuery->get();
 
