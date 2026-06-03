@@ -337,7 +337,8 @@
 </div>
 
 <!-- Modal: Ingreso Manual (PF - Verdad de Campo) -->
-<div id="manualModal" class="fixed inset-0 bg-slate-900/60 hidden items-center justify-center z-[100] backdrop-blur-sm p-4">
+<div id="manualModal"
+     class="fixed inset-0 hidden place-items-center bg-slate-900/60 z-[100] backdrop-blur-sm p-4">
     <div class="w-full max-w-lg bg-white rounded-3xl p-6 md:p-8 shadow-2xl max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-4">
             <h4 class="text-lg font-black">Ingreso Manual — Grupo Control</h4>
