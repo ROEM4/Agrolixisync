@@ -37,6 +37,8 @@ class DatabaseSeeder extends Seeder
             
             // Alertas (análisis de tiempo de detección)
             AlertSeeder::class,
+            // Datos de análisis, PF y TPD para vistas (seeded según especificación)
+            AnalisisSeeder::class,
         ]);
     }
 }

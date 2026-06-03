@@ -59,6 +59,8 @@ Route::get('/historico', function () {
 
 Route::get('/analisis', [\App\Http\Controllers\AnalisisController::class, 'index'])->name('analisis');
 Route::get('/analisis/export', [\App\Http\Controllers\AnalisisController::class, 'export'])->name('analisis.export');
+// Ingreso manual desde la vista de Análisis (no requiere middleware en este caso)
+Route::post('/analisis/pf-manual', [\App\Http\Controllers\AnalisisController::class, 'storeManual'])->name('analisis.pf_manual');
 Route::get('/lixiviacion', [\App\Http\Controllers\LixiviacionController::class, 'index'])->name('lixiviacion');
 Route::get('/lixiviacion/export', [\App\Http\Controllers\LixiviacionController::class, 'export'])->name('lixiviacion.export');
 

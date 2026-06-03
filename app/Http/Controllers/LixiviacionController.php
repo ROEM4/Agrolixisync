@@ -9,6 +9,7 @@ use App\Models\PFRecord;
 use App\Models\Analysis;
 use App\Models\Alert;
 use App\Models\Observacion;
+use App\Models\DetectionTimeRecord;
 use Carbon\Carbon;
 
 class LixiviacionController extends Controller
@@ -251,6 +252,27 @@ class LixiviacionController extends Controller
                 'tiempo_riesgo' => $now,
                 'tiempo_alerta' => $now,
             ]);
+
+            // Guardar/actualizar registro de tiempo de detección (TPD)
+            try {
+                $diffSec = 0;
+                if ($alert->tiempo_alerta && $alert->tiempo_riesgo) {
+                    $diffSec = $alert->tiempo_riesgo->diffInSeconds($alert->tiempo_alerta);
+                }
+                DetectionTimeRecord::updateOrCreate(
+                    ['fecha' => $alert->tiempo_alerta->format('Y-m-d'), 'location_id' => $location->id],
+                    [
+                        'lote_id' => $location->lote_id,
+                        'tiempo_promedio_segundos' => $diffSec,
+                        'cantidad_eventos' => 1,
+                        'suma_tiempos_segundos' => $diffSec,
+                        'tipo_entrada' => 'manual',
+                        'subparcela' => null,
+                    ]
+                );
+            } catch (\Exception $e) {
+                // No bloquear el flujo si falla el guardado del TPD
+            }
 
             $observacion = new Observacion([
                 'location_id'        => $location->id,

@@ -7,6 +7,8 @@ use App\Modules\AnalyticsEngine\AnalisisService;
 use App\Models\Observacion;
 use App\Models\Location;
 use Carbon\Carbon;
+use App\Models\PFRecord;
+use Illuminate\Support\Facades\Validator;
 
 class AnalisisController extends Controller
 {
@@ -56,39 +58,40 @@ class AnalisisController extends Controller
         if ($location_id) {
             $controlQuery->where('location_id', $location_id);
         }
-        $controlRecords = $controlQuery->orderByDesc('recorded_at')
-                            ->paginate(10, ['*'], 'control_page')
-                            ->withQueryString();
+        // Obtener exactamente 15 registros ordenados asc por fecha para cumplir el requisito de la vista
+        $controlRecords = $controlQuery->orderBy('recorded_at', 'asc')
+                            ->take(15)
+                            ->get();
 
-        // Parcela Experimental Observations (IoT con Matriz de Confusión)
+        // Parcela Experimental Observations (IoT) — mantendremos dailyStats para la tabla experimental (agregado por día)
         $expQuery = \App\Models\Observacion::where('experimental_group', 'experimental');
         if ($location_id) {
             $expQuery->where('location_id', $location_id);
         }
-        $experimentalRecords = $expQuery->orderByDesc('created_at')
-                                ->paginate(10, ['*'], 'exp_page')
-                                ->withQueryString();
+        $experimentalRecords = $expQuery->orderBy('created_at', 'asc')
+                                ->take(15)
+                                ->get();
 
-        // Preparar campos de presentación en backend para evitar cálculos en la vista
-        $controlRecords->getCollection()->transform(function ($record) {
+        // Preparar campos de presentación para los registros de control
+        $controlRecords = $controlRecords->map(function ($record) {
             $record->date_label = $record->recorded_at ? $record->recorded_at->format('d/m/Y') : 'N/A';
             $record->ce_superficial_str = number_format($record->ce_superficial ?? 0, 3);
             $record->ce_profunda_str = number_format($record->ce_profunda ?? 0, 3);
-            $record->ce_reference_str = number_format($record->ce_reference ?? 0, 4);
+            $record->ilx_str = number_format((($record->ce_profunda && $record->ce_superficial) ? ($record->ce_profunda / $record->ce_superficial) : 0), 4);
+            $record->pf_percentage = $record->pf_percentage ?? 0;
+            $record->events = $record->events ?? 1;
 
-            $is_loss = (($record->ce_reference ?? 0) > 1.05) || (($record->ce_profunda ?? 0) > ($record->ce_superficial ?? 0));
-            if ($is_loss) {
-                $record->condition_label = 'Pérdida';
-                $record->condition_badge_html = '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-100 text-amber-800 border border-amber-200 uppercase tracking-wide">Pérdida</span>';
-            } else {
-                $record->condition_label = 'Óptimo';
-                $record->condition_badge_html = '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black bg-slate-100 text-slate-600 border border-slate-200 uppercase tracking-wide">Óptimo</span>';
-            }
+            $lossPct = floatval($record->pf_percentage ?: 0);
+            $state = 'Normal';
+            if ($lossPct > 50) $state = 'Alta pérdida';
+            elseif ($lossPct > 10) $state = 'Baja pérdida';
+            $record->estado = $state;
 
             return $record;
         });
 
-        $experimentalRecords->getCollection()->transform(function ($obs) {
+        // Preparar campos para observaciones experimentales (simple mapping)
+        $experimentalRecords = $experimentalRecords->map(function ($obs) {
             $obs->date_label = $obs->created_at ? $obs->created_at->format('d/m/Y') : 'N/A';
 
             // Detección IoT
@@ -181,5 +184,61 @@ class AnalisisController extends Controller
         };
 
         return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * Almacena un registro PF ingresado manualmente desde la vista de Análisis.
+     */
+    public function storeManual(Request $request)
+    {
+        $data = $request->all();
+
+        $validator = Validator::make($data, [
+            'subparcela' => 'required|string|max:100',
+            'recorded_at' => 'required|date',
+            'ce_superficial' => 'required|numeric',
+            'ce_profunda' => 'required|numeric',
+            'ce_reference' => 'nullable|numeric',
+            'pf_percentage' => 'nullable|numeric',
+        ]);
+
+        if ($validator->fails()) {
+            return back()->withErrors($validator)->withInput();
+        }
+
+        // Calcular ILx si no fue entregado
+        $ce_s = floatval($data['ce_superficial']);
+        $ce_p = floatval($data['ce_profunda']);
+        $ilx = $ce_s > 0 ? round($ce_p / $ce_s, 4) : null;
+
+        // Si proporcionaron ce_reference o pf_percentage usamos esos valores
+        $ce_reference = isset($data['ce_reference']) && $data['ce_reference'] !== '' ? floatval($data['ce_reference']) : ($ilx ?? null);
+
+        $ce_measured = isset($data['ce_measured']) ? floatval($data['ce_measured']) : ($ce_reference ?? $ilx ?? 0);
+
+        // Calcular pérdida si no viene
+        $pf = null;
+        if (isset($data['pf_percentage']) && $data['pf_percentage'] !== '') {
+            $pf = floatval($data['pf_percentage']);
+        } elseif ($ce_reference && $ce_measured) {
+            if ($ce_reference != 0) {
+                $pf = (($ce_reference - $ce_measured) / $ce_reference) * 100.0;
+            }
+        }
+
+        // No vinculamos a location de forma obligatoria (puede ser global)
+        PFRecord::create([
+            'location_id' => null,
+            'experimental_group' => 'control',
+            'recorded_at' => $data['recorded_at'],
+            'ce_superficial' => $ce_s,
+            'ce_profunda' => $ce_p,
+            'ce_reference' => $ce_reference,
+            'ce_measured' => $ce_measured,
+            'subparcela' => $data['subparcela'],
+            'pf_percentage' => $pf,
+        ]);
+
+        return redirect()->route('analisis')->with('success', 'Registro PF manual guardado.');
     }
 }

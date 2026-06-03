@@ -241,9 +241,11 @@
             <select id="f-location" onchange="changeFilter('location')">
                 <option value="">Todas las ubicaciones</option>
                 @foreach($locations as $loc)
+                    @if(in_array($loc->id, [3, 4]))
                     <option value="{{ $loc->id }}" {{ $location_id == $loc->id ? 'selected' : '' }}>
                         {{ $loc->lote->name ?? 'Sin Lote' }} — {{ $loc->name }}
                     </option>
+                    @endif
                 @endforeach
             </select>
         </div>
@@ -374,7 +376,7 @@
                 <select name="location_id" class="w-full" required style="width: 100%; padding: 0.6rem 0.8rem; border: 1px solid #e5e7eb; border-radius: 10px; font-size: 0.85rem; background: #fff; outline: none;">
                     <option value="">Seleccione una subparcela de control...</option>
                     @foreach($locations as $loc)
-                        @if($loc->experimental_group === 'control')
+                        @if($loc->experimental_group === 'control' && in_array($loc->id, [3, 4]))
                             <option value="{{ $loc->id }}" {{ $location_id == $loc->id ? 'selected' : '' }}>
                                 {{ $loc->lote->name ?? 'Sin Lote' }} — {{ $loc->name }}
                             </option>

@@ -79,6 +79,7 @@
 @if($lotes->count() > 0)
     <div class="lotes-grid">
         @foreach($lotes as $lote)
+        @if(in_array($lote->name, ['LOTE-01', 'Auto - ESP32-G1']))
         <div class="lote-card">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;">
                 <div>
@@ -121,6 +122,7 @@
                 @endif
             </div>
         </div>
+        @endif
         @endforeach
     </div>
 

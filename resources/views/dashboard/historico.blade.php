@@ -153,18 +153,6 @@
 
 {{-- Stats --}}
 <div class="stats-grid" id="stats-section" style="display:none;">
-    <div class="stat-card" style="border-left:4px solid #3b82f6;">
-        <div class="s-label">CE Superficial (20cm)</div>
-        <div class="s-val" id="s-ce-sup" style="color:#3b82f6;">--</div>
-        <div class="s-sub">dS/m promedio</div>
-        <div class="s-range" id="s-ce-sup-range"></div>
-    </div>
-    <div class="stat-card" style="border-left:4px solid #06b6d4;">
-        <div class="s-label">CE Profundo (60cm)</div>
-        <div class="s-val" id="s-ce-prof" style="color:#06b6d4;">--</div>
-        <div class="s-sub">dS/m promedio</div>
-        <div class="s-range" id="s-ce-prof-range"></div>
-    </div>
     <div class="stat-card" style="border-left:4px solid #f59e0b;">
         <div class="s-label">Total Lecturas</div>
         <div class="s-val" id="s-total" style="color:#f59e0b;">--</div>
@@ -209,22 +197,26 @@
 </div>
 
 {{-- Tabla diaria --}}
-<div class="table-card">
+<div class="table-card" id="table-section" style="display:none;">
     <div class="table-head">Registros Históricos</div>
     <div style="overflow-x:auto;">
         <table id="hist-table">
             <thead>
                 <tr>
-                    <th>Fecha y Hora</th>
+                    <th>Fecha</th>
                     <th>CE Superficial</th>
                     <th>CE Profunda</th>
-                    <th>Índice ILx</th>
-                    <th>Estado / Riesgo</th>
+                    <th>Δ CE (Dif.)</th>
+                    <th>Ratio ILx</th>
+                    <th>Hum. Sup (%)</th>
+                    <th>Temp. Sup (°C)</th>
+                    <th>Muestras (n)</th>
+                    <th>Estado</th>
                 </tr>
             </thead>
             <tbody id="hist-body">
                 <tr>
-                    <td colspan="5" class="placeholder">
+                    <td colspan="9" class="placeholder">
                         <i class="fas fa-search mb-2 block text-2xl opacity-20"></i>
                         Selecciona filtros y pulsa "Cargar Histórico"
                     </td>
@@ -265,13 +257,14 @@ function destroyCharts() {
     [chartCE, chartHum, chartTemp, chartDelta].forEach(c => c?.destroy());
 }
 
-async function loadData() {
+async function loadHistorico() {
     const locId = document.getElementById('h-location').value;
     const days  = document.getElementById('h-days').value;
 
     if (!locId) { alert('Selecciona una ubicación'); return; }
 
     const btn = document.querySelector('.btn-load');
+    const originalBtnText = btn.innerHTML;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando...';
     btn.disabled = true;
 
@@ -302,6 +295,9 @@ async function loadData() {
     } catch(e) {
         document.getElementById('h-status').textContent = '❌ Error al cargar';
         console.error(e);
+    } finally {
+        btn.innerHTML = originalBtnText;
+        btn.disabled = false;
     }
 }
 
@@ -310,8 +306,6 @@ function renderStats(analytics) {
     const prof = analytics.profundo;
     const fmt  = (v, d=4) => v !== null && v !== undefined ? parseFloat(v).toFixed(d) : '--';
 
-    document.getElementById('s-ce-sup').textContent  = fmt(sup?.stats?.hum_avg, 4);  // placeholder hasta tener CE daily
-    document.getElementById('s-ce-prof').textContent = fmt(prof?.stats?.hum_avg, 4);
     document.getElementById('s-total').textContent   = (sup?.stats?.total_readings ?? 0) + (prof?.stats?.total_readings ?? 0);
     document.getElementById('s-days-range').textContent = `${analytics.days} días`;
 
@@ -389,24 +383,29 @@ function renderCharts(daily, analytics) {
 }
 
 function renderTable(daily) {
-    const body = document.getElementById('daily-body');
+    const body = document.getElementById('hist-body');
     if (!daily.length) {
-        body.innerHTML = '<tr><td colspan="7" style="padding:2rem;text-align:center;color:#9ca3af;">Sin datos para el período</td></tr>';
+        body.innerHTML = '<tr><td colspan="9" style="padding:2rem;text-align:center;color:#9ca3af;">Sin datos para el período</td></tr>';
         return;
     }
     body.innerHTML = [...daily].reverse().map(d => {
         const cs = d.ce_sup_avg  ?? d.avg_ce_sup  ?? null;
         const cp = d.ce_prof_avg ?? d.avg_ce_prof ?? null;
+        const ilx = cs > 0 ? (cp / cs).toFixed(4) : '--';
         const delta = cs !== null && cp !== null ? (cs - cp).toFixed(6) : '--';
         const deltaColor = delta !== '--' ? (Math.abs(parseFloat(delta)) > 0.35 ? '#dc2626' : Math.abs(parseFloat(delta)) > 0.15 ? '#d97706' : '#16a34a') : '#9ca3af';
+        const estado = parseFloat(ilx) > 1.0 ? '<span class="text-red-600 font-bold">Lixiviación</span>' : (parseFloat(ilx) < 0.4 ? 'Baja' : 'Normal');
+        
         return `<tr>
-            <td style="color:#374151;">${d.day ?? d.date ?? '--'}</td>
-            <td style="color:#3b82f6;">${cs !== null ? parseFloat(cs).toFixed(6) : '--'}</td>
-            <td style="color:#06b6d4;">${cp !== null ? parseFloat(cp).toFixed(6) : '--'}</td>
-            <td style="color:${deltaColor};font-weight:600;">${delta}</td>
-            <td>${d.hum_sup_avg ?? '--'}</td>
-            <td>${d.temp_sup_avg ?? '--'}</td>
-            <td style="color:#9ca3af;">${d.n ?? d.count ?? '--'}</td>
+            <td style="color:#374151; font-weight:700;">${d.day ?? d.date ?? '--'}</td>
+            <td style="color:#3b82f6; font-family:monospace;">${cs !== null ? parseFloat(cs).toFixed(4) : '--'}</td>
+            <td style="color:#06b6d4; font-family:monospace;">${cp !== null ? parseFloat(cp).toFixed(4) : '--'}</td>
+            <td style="color:${deltaColor}; font-family:monospace; font-weight:700;">${delta}</td>
+            <td style="font-weight:700; color:#6366f1; font-family:monospace;">${ilx}</td>
+            <td style="color:#10b981;">${d.hum_sup_avg ? parseFloat(d.hum_sup_avg).toFixed(1) + '%' : '--'}</td>
+            <td style="color:#f59e0b;">${d.temp_sup_avg ? parseFloat(d.temp_sup_avg).toFixed(1) + '°C' : '--'}</td>
+            <td style="color:#9ca3af; text-align:center;">${d.n ?? d.count ?? '--'}</td>
+            <td>${estado}</td>
         </tr>`;
     }).join('');
 }

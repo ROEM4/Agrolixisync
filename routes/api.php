@@ -10,6 +10,7 @@ use App\Modules\Storage\SdIngestionService;
 use App\Http\Controllers\SensorController;
 use App\Http\Controllers\AnalysisController;
 use App\Http\Controllers\ExportController;
+use App\Http\Controllers\Api\AlertController as ApiAlertController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -398,6 +399,9 @@ Route::get('/readings/analytics', function (Request $request) {
         'profundo'   => $buildAnalytics($sensors->get(60)),
     ]);
 })->name('api.readings.analytics');
+
+// Lista pública de alertas con TPD calculado (para frontend alertas)
+Route::get('/alerts/list', [ApiAlertController::class, 'index'])->name('api.alerts.list');
 
 // Métricas y validación manual eliminadas a favor del sistema automático AnalisisService
 

@@ -279,7 +279,27 @@ const ILX = {
     RET_LOW   : 0.70,
 };
 
-// Umbrales CE (solo para badge de tarjeta, no definen estado del sistema)
+// Umbrales CE ()
+(function loadTpdArrays(){
+    fetch('/api/alerts/list')
+        .then(r => r.json())
+        .then(json => {
+            if (!json || json.status !== 'success') return;
+            const control = [];
+            const experimental = [];
+            json.data.forEach(a => {
+                const tpd = a.tpd_seconds || null;
+                const loteName = a.location?.lote || '';
+                if (loteName && loteName.toLowerCase().includes('control')) {
+                    if (tpd !== null) control.push(tpd);
+                } else {
+                    if (tpd !== null) experimental.push(tpd);
+                }
+            });
+            window.DETECTION_TIMES = { control, experimental };
+            console.debug('TPD arrays loaded', window.DETECTION_TIMES);
+        }).catch(()=>{});
+})();
 const THRESHOLDS = {
     ce_sup_max : 0.600,
     ce_prof_max: 0.750,

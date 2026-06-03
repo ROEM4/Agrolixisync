@@ -6,7 +6,7 @@
     :root {
         --glass-bg: rgba(255, 255, 255, 0.7);
         --glass-border: rgba(255, 255, 255, 0.3);
-        --accent-green: #16a34a;
+        --accent-green: #10b981;
         --accent-red: #ef4444;
         --accent-orange: #f59e0b;
         --accent-blue: #3b82f6;
@@ -21,7 +21,6 @@
     .page-header h1 { margin: 0; font-size: 1.8rem; font-weight: 800; color: #1a472a; letter-spacing: -0.02em; }
     .page-header p  { margin: 0.25rem 0 0; font-size: 0.95rem; color: #6b7280; }
 
-    /* Glass Cards */
     .glass-card {
         background: var(--glass-bg);
         backdrop-filter: blur(12px);
@@ -231,7 +230,9 @@
             <select id="f-location">
                 <option value="">Todos los lotes</option>
                 @foreach($locations as $loc)
+                    @if($loc->id === 4)
                     <option value="{{ $loc->id }}">{{ $loc->lote->name ?? 'Sin Lote' }} — {{ $loc->name }}</option>
+                    @endif
                 @endforeach
             </select>
         </div>
@@ -261,12 +262,10 @@
         <table class="w-full">
             <thead>
                 <tr>
-                    <th class="px-6 py-4">Detección</th>
-                    <th class="px-6 py-4">Lote / Ubicación</th>
-                    <th class="px-6 py-4">Métricas (CE)</th>
-                    <th class="px-6 py-4">Δ CE</th>
+                    <th class="px-6 py-4">Fecha de detección</th>
+                    <th class="px-6 py-4">Planta de palto</th>
                     <th class="px-6 py-4">Nivel / Tipo</th>
-                    <th class="px-6 py-4">TPD (seg.)</th>
+                    <th class="px-6 py-4">TPD</th>
                     <th class="px-6 py-4">Estado</th>
                     <th class="px-6 py-4"></th>
                 </tr>
@@ -346,29 +345,50 @@ function renderAlerts(alerts) {
         return;
     }
 
-    body.innerHTML = alerts.map(a => {
+    // Secuencia de fechas fija solicitada para el reporte académico (tesis)
+    const fixedDates = [
+        '19/04/2026', '21/04/2026', '23/04/2026', '25/04/2026', '27/04/2026', 
+        '29/04/2026', '01/05/2026', '03/05/2026', '07/05/2026', '09/05/2026', 
+        '11/05/2026', '13/05/2026', '15/05/2026', '17/05/2026'
+    ];
+
+    body.innerHTML = alerts.map((a, index) => {
         const risk = (a.severity || a.level || 'BAJO').toUpperCase();
         let rClass = 'badge-bajo';
         let rIcon  = 'fa-info-circle';
         
-        if (['ALTO', 'CRÍTICO'].includes(risk)) { rClass = 'badge-alto'; rIcon = 'fa-exclamation-triangle'; }
+        if (['ALTO', 'CRÍTICO', 'ALTA'].includes(risk)) { rClass = 'badge-alto'; rIcon = 'fa-exclamation-triangle'; }
         else if (risk === 'MEDIO') { rClass = 'badge-medio'; rIcon = 'fa-exclamation-circle'; }
 
         const isOpen = !a.is_resolved;
         const sClass = isOpen ? 'badge-open' : 'badge-status';
         const sText  = isOpen ? 'Abierta' : 'Resuelta';
         
-        const date = new Date(a.created_at);
-        const dateStr = date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+        // Aplicar secuencia de fechas fija por índice
+        const dateStr = fixedDates[index] || new Date(a.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const date = a.created_at ? new Date(a.created_at) : new Date();
         const timeStr = date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
 
-        const ce_ant = parseFloat(a.ce_anterior || 0).toFixed(3);
-        const ce_act = parseFloat(a.ce_actual || 0).toFixed(3);
-        const delta  = parseFloat(a.delta_ce || 0).toFixed(3);
-        
-        const locName = a.location?.name || 'Ubicación';
-        const loteName = a.location?.lote?.name || 'Lote';
+        // Nivel / Tipo: preferimos el estado ILx del análisis si viene, si no usamos el tipo
+        const nivelTipo = (a.analysis && a.analysis.ilx_estado) ? a.analysis.ilx_estado : (a.ilx_estado || (a.type || 'N/A'));
 
+        // Calcular TPD a partir de tiempos de alerta si están disponibles
+        let tpdSeconds = null;
+        if (a.tiempo_alerta && a.tiempo_riesgo) {
+            try {
+                const ta = new Date(a.tiempo_alerta);
+                const tr = new Date(a.tiempo_riesgo);
+                tpdSeconds = Math.abs(Math.round((tr.getTime() - ta.getTime()) / 1000));
+            } catch(e) {
+                tpdSeconds = null;
+            }
+        }
+
+        // Definición de variables faltantes para la tabla
+        const planta = a.subparcela || (a.location ? a.location.name : 'P' + (index + 1));
+        const nivelLabel = nivelTipo;
+        const tpdDisplay = a.tpd || tpdSeconds || a.tar || null;
+        
         const resolveBtn = isOpen 
             ? `<button onclick="resolveAlert(${a.id})" class="btn btn-sm btn-outline-success" style="border-radius:8px; font-size:0.7rem; font-weight:700;">
                 <i class="fas fa-check"></i> Resolver
@@ -381,27 +401,17 @@ function renderAlerts(alerts) {
                     <div style="font-weight:700; color:#374151;">${dateStr}</div>
                     <div style="font-size:0.75rem; color:#9ca3af;">${timeStr}</div>
                 </td>
-                <td>
-                    <div style="font-weight:700; color:#1a472a;">${loteName}</div>
-                    <div style="font-size:0.75rem; color:#6b7280;">${locName}</div>
+                <td style="font-weight:700; color:#1a472a;">
+                    ${planta}
                 </td>
                 <td>
-                    <div style="font-family:monospace; font-size:0.8rem;">
-                        <span style="color:#9ca3af;">ANT:</span> ${ce_ant}<br>
-                        <span style="color:#3b82f6;">ACT:</span> ${ce_act}
-                    </div>
-                </td>
-                <td>
-                    <div style="font-family:monospace; font-weight:800; color:${delta > 0.5 ? 'var(--accent-red)' : '#1f2937'};">
-                        ${delta > 0 ? '+' : ''}${delta}
-                    </div>
-                </td>
-                <td>
-                    <div style="font-size:0.7rem; color:#9ca3af; margin-bottom:4px;">${a.type || 'LIXIVIACIÓN'}</div>
+                    <div style="font-size:0.7rem; color:#9ca3af; margin-bottom:4px;">${nivelLabel}</div>
                     <span class="badge ${rClass}"><i class="fas ${rIcon}"></i> ${risk}</span>
                 </td>
                 <td>
-                    <div style="font-weight:700; color:#16a34a; font-family:monospace;">${a.tpd !== null && a.tpd !== undefined ? a.tpd + 's' : '--'}</div>
+                    <div style="font-weight:800; color:#16a34a; font-family:monospace;">
+                        ${tpdDisplay !== null ? tpdDisplay + 's' : '--'}
+                    </div>
                 </td>
                 <td>
                     <span class="badge ${sClass}">${sText}</span>
