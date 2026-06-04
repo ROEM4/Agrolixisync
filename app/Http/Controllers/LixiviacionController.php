@@ -20,6 +20,14 @@ class LixiviacionController extends Controller
         $filter = $request->query('filter', '30d');
         $locations = Location::with('lote')->orderBy('name')->get();
 
+        if (empty($location_id)) {
+            $optCtrl = $locations->where('lote.name', 'Lote 01 - Parcela Control (Tradicional)')->first()
+                ?? $locations->where('experimental_group', 'control')->first();
+            if ($optCtrl) {
+                $location_id = $optCtrl->id;
+            }
+        }
+
         $query = Analysis::with('location.lote')->orderByDesc('analyzed_at');
 
         if ($location_id) {

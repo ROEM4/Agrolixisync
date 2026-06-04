@@ -228,7 +228,7 @@
         <div class="filter-group">
             <label>Ubicación</label>
             <select id="f-location">
-                <option value="">Todos los lotes</option>
+
                 @foreach($locations as $loc)
                     @if($loc->id === 4)
                     <option value="{{ $loc->id }}">{{ $loc->lote->name ?? 'Sin Lote' }} — {{ $loc->name }}</option>

@@ -100,9 +100,11 @@
     <div>
         <label>Lote / Ubicación</label>
         <select id="h-location">
-            <option value="">-- Seleccionar --</option>
             @foreach($locations as $loc)
-                <option value="{{ $loc->id }}">{{ $loc->lote->name ?? $loc->name }} — {{ $loc->name }}</option>
+                @if(str_contains(strtolower($loc->name), 'experimental'))
+                    <option value="{{ $loc->id }}" selected>Auto - ESP32-G1- Parcela Experimental (AgrolixiSync)</option>
+                    @break
+                @endif
             @endforeach
         </select>
     </div>
@@ -490,10 +492,12 @@ document.getElementById('csv-import-form')?.addEventListener('submit', async fun
     }
 });
 
-// Auto-cargar si hay un lote guardado
+// Auto-cargar si hay un lote guardado o valor por defecto ya seleccionado
 const saved = localStorage.getItem('agro_loc');
 const sel   = document.getElementById('h-location');
-if (saved && sel.querySelector(`option[value="${saved}"]`)) {
+if (sel && sel.value) {
+    loadHistorico();
+} else if (saved && sel && sel.querySelector(`option[value="${saved}"]`)) {
     sel.value = saved;
     loadHistorico();
 }

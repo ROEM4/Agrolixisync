@@ -162,17 +162,18 @@
                 <input type="hidden" name="filter" value="{{ $filter }}">
                 <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">📍 Seleccionar Ubicación</label>
                 @php
-                    $optCtrl = $locations->where('lote.name', 'Lote 01 - Parcela Control (Tradicional)')->first();
-                    $optExp  = $locations->where('lote.name', 'Auto-Esp32G1 - Parcela Experimental (Agrolixisync)')->first();
+                    $optCtrl = $locations->where('experimental_group', 'control')->first();
+                    $optExp  = $locations->where('experimental_group', 'experimental')
+                                         ->filter(fn($l) => str_contains(strtolower($l->name), 'experimental'))
+                                         ->first();
                 @endphp
                 <select name="location_id" id="location-selector" onchange="this.form.submit()" 
                         class="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-emerald-500 transition-all shadow-sm">
-                    <option value="">-- Seleccionar Lote/Ubicación --</option>
                     @if($optCtrl)
-                        <option value="{{ $optCtrl->id }}" {{ $location_id == $optCtrl->id ? 'selected' : '' }}>{{ $optCtrl->lote->name ?? $optCtrl->name }} — {{ $optCtrl->name }}</option>
+                        <option value="{{ $optCtrl->id }}" {{ $location_id == $optCtrl->id ? 'selected' : '' }}>Lote 01 - Parcela Control (Tradicional) — Lote 01 - Parcela Control (Tradicional)</option>
                     @endif
                     @if($optExp)
-                        <option value="{{ $optExp->id }}" {{ $location_id == $optExp->id ? 'selected' : '' }}>{{ $optExp->lote->name ?? $optExp->name }} — {{ $optExp->name }}</option>
+                        <option value="{{ $optExp->id }}" {{ $location_id == $optExp->id ? 'selected' : '' }}>Auto - ESP32-G1- Parcela Experimental (AgrolixiSync)</option>
                     @endif
                 </select>
             </form>
