@@ -194,7 +194,7 @@
                                 <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider">CE Sup</th>
                                 <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider">CE Prof</th>
                                 <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider">ILx</th>
-                                <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider">Pérdida %</th>
+                                <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider">Precisión %</th>
                                 <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider">Eventos</th>
                                 <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider">Estado</th>
                             </tr>
@@ -292,7 +292,7 @@
                                     $vn = $exp['vn'] ?? 0;
                                 @endphp
                                 <tr class="hover:bg-slate-50/50 transition-colors">
-                                    <td class="px-4 py-3 font-bold">{{ $selectedLocation ? ($selectedLocation->lote->name ?? $selectedLocation->name) : 'Auto-Esp32G1' }}</td>
+                                    <td class="px-4 py-3 font-bold text-slate-700">{{ $day['subparcela'] ?? 'P'.($i+1) }}</td>
                                     <td class="px-4 py-3 font-bold">{{ $day['date_label'] }}</td>
                                     <td class="px-3 py-3 text-center font-bold text-emerald-700">{{ $vp }}</td>
                                     <td class="px-3 py-3 text-center font-bold text-red-600">{{ $fp }}</td>
