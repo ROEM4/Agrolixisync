@@ -18,7 +18,7 @@ class AnalisisSeeder extends Seeder
     {
         // Crear/obtener lotes y ubicaciones
         $loteCtrl = Lote::firstOrCreate(
-            ['name' => 'Lote 01 - Parcela Control (Tradicional)'],
+            ['name' => 'Lote 01 - Grupo de Control'],
             ['user_id' => 1]
         );
         $loteExp  = Lote::firstOrCreate(

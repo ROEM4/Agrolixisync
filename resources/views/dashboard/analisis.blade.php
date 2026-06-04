@@ -86,17 +86,9 @@
     {{-- Header --}}
     <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">
         <div>
-            <div class="flex items-center gap-2 mb-2">
-                <span class="px-2.5 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-black rounded-lg uppercase tracking-widest border border-indigo-100 scientific-badge">
-                    Metodología de Tesis Experimental
-                </span>
-            </div>
             <h1 class="text-4xl font-extrabold text-slate-900 tracking-tight" style="font-family: var(--outfit-font);">
-                Evaluación Comparativa de Pérdida de Fertilizantes
+                Porcentaje de Precisión de detección de Pérdida de Fertilizantes
             </h1>
-            <p class="text-slate-500 font-medium mt-1 text-sm">
-                Monitoreo y validación de lixiviación mediante Conductividad Eléctrica (CE). Comparación rigurosa de grupos.
-            </p>
         </div>
         
         <div class="flex gap-3">
@@ -169,18 +161,6 @@
         </div>
     @endif
 
-    {{-- Evidencia Experimental Section Title --}}
-    <div class="flex items-center gap-4 mb-6 border-b border-slate-200 pb-3">
-        <span class="text-xl">📊</span>
-        <h2 class="text-xl font-black text-slate-800 uppercase tracking-wider" style="font-family: var(--outfit-font);">
-            @if(isset($selectedLocation))
-                {{ $selectedLocation->experimental_group === 'control' ? 'Evidencia Física - Grupo Control' : 'Evidencia de Detección - Grupo Experimental' }}
-            @else
-                Evidencia Experimental & Registros Científicos
-            @endif
-        </h2>
-    </div>
-
     {{-- Tables Grid --}}
     <div class="grid grid-cols-1 gap-12 mb-12">
         @php
@@ -194,7 +174,7 @@
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
                     <span class="w-3 h-3 rounded-full bg-amber-500"></span>
-                    Tabla Diaria: Grupo Control (Verdad de Campo)
+                    Tabla Diaria: Grupo Control 
                 </h3>
                 <div class="flex items-center gap-3">
                     <span class="text-[10px] font-bold text-slate-400 uppercase">Consolidado por fecha</span>
@@ -214,7 +194,7 @@
                                 <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider">CE Sup</th>
                                 <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider">CE Prof</th>
                                 <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider">ILx</th>
-                                <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider">Loss %</th>
+                                <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider">Pérdida %</th>
                                 <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider">Eventos</th>
                                 <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider">Estado</th>
                             </tr>

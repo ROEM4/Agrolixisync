@@ -18,7 +18,9 @@ class DashboardController extends Controller
 
     public function realtime(Request $request)
     {
-        $locations = \App\Models\Location::with('lote')->orderBy('name')->get();
+        $locations = \App\Models\Location::with('lote')
+        ->where('id', 2) // 👈 tu lote fijo
+        ->get();
 
         $analysisRecords = Analysis::with(['location', 'lote'])
             ->when($request->query('location_id'), fn($q, $locationId) => $q->where('location_id', $locationId))

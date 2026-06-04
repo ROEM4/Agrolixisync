@@ -91,18 +91,20 @@
 </style>
 
 <div class="page-header">
-    <h1>📋 Registro e Histórico de Lecturas</h1>
-    <p>Historial reciente y tendencias diarias de CE, humedad y temperatura por lote</p>
+    <h1>📋 Historial de Registro de Lecturas</h1>
+    <p>Historial reciente y tendencias diarias de CE, humedad y temperatura</p>
 </div>
 
 {{-- Toolbar --}}
 <div class="toolbar">
     <div>
-        <label>Lote / Ubicación</label>
+        <label>Ubicación</label>
         <select id="h-location">
             @foreach($locations as $loc)
-                @if(str_contains(strtolower($loc->name), 'experimental') || str_contains(strtolower($loc->name), 'parcela'))
-                    <option value="{{ $loc->id }}" selected>{{ $loc->name }}</option>
+                @if($loc->id == 1)
+                <option value="{{ $loc->id }}" selected>
+                    {{ $loc->id == 1 ? 'Planta de Palto - GE' : $loc->name }}
+                </option>
                 @endif
             @endforeach
         </select>

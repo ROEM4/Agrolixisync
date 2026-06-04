@@ -118,9 +118,9 @@
                 <div class="live-dot"></div>
                 <span class="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Monitoreo en Tiempo Real</span>
             </div>
-            <h1 class="text-4xl font-black text-slate-900 tracking-tight">Índice de Lixiviación</h1>
+            <h1 class="text-4xl font-black text-slate-900 tracking-tight">Nivel de Lixiviación</h1>
             <div class="mt-8 text-center text-[10px] font-bold text-slate-400 italic">
-                * El Índice de Lixiviación mide la relación entre nutrientes profundos y superficiales.
+                * El Nivel de Lixiviación mide la relación entre nutrientes profundos y superficiales.
             </div>
         </div>
 
@@ -170,10 +170,10 @@
                 <select name="location_id" id="location-selector" onchange="this.form.submit()" 
                         class="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-emerald-500 transition-all shadow-sm">
                     @if($optCtrl)
-                        <option value="{{ $optCtrl->id }}" {{ $location_id == $optCtrl->id ? 'selected' : '' }}>Lote 01 - Parcela Control (Tradicional) — Lote 01 - Parcela Control (Tradicional)</option>
+                        <option value="{{ $optCtrl->id }}" {{ $location_id == $optCtrl->id ? 'selected' : '' }}>Planta de palto - GC</option>
                     @endif
                     @if($optExp)
-                        <option value="{{ $optExp->id }}" {{ $location_id == $optExp->id ? 'selected' : '' }}>Auto - ESP32-G1- Parcela Experimental (AgrolixiSync)</option>
+                        <option value="{{ $optExp->id }}" {{ $location_id == $optExp->id ? 'selected' : '' }}>Planta de palto - GE</option>
                     @endif
                 </select>
             </form>
@@ -201,7 +201,7 @@
                     </span>
                     <div>
                         <h3 class="text-xl font-black {{ $isCtrl ? 'text-amber-800' : 'text-emerald-800' }}">
-                            {{ $isCtrl ? 'Entrada Manual — Grupo Control' : 'Monitoreo Automático — Grupo Experimental' }}
+                            {{ $isCtrl ? 'Entrada Manual — Grupo Control' : 'Monitoreo del Grupo Experimental' }}
                         </h3>
                         <p class="text-sm font-medium {{ $isCtrl ? 'text-amber-600' : 'text-emerald-600' }}">
                             {{ $isCtrl ? 'Ingrese las lecturas manuales del conductimetro digital' : 'Datos recolectados por sensores IoT en tiempo real.' }}
@@ -269,7 +269,7 @@
 
         {{-- ILx --}}
         <div class="glass-card p-8 border-l-4 border-indigo-500" id="card-ilx">
-            <div class="kpi-title">Índice de Lixiviación</div>
+            <div class="kpi-title">Nivel de Lixiviación</div>
             <div class="flex items-baseline mb-4">
                 <div class="kpi-value" id="kpi-ilx">--</div>
                 <div class="kpi-unit">ratio</div>
@@ -287,7 +287,7 @@
             <div style="height:220px;"><canvas id="lxCeSupChart"></canvas></div>
         </div>
         <div class="glass-card p-6">
-            <h4 class="kpi-title">Índice de Lixiviación — Evolución</h4>
+            <h4 class="kpi-title">Nivel de Lixiviación</h4>
             <div style="height:220px;"><canvas id="lxIlxChart"></canvas></div>
         </div>
         <div class="glass-card p-6">

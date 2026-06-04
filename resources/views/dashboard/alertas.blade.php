@@ -226,15 +226,26 @@
 <div class="glass-card mb-12">
     <div class="filter-section rounded-t-2xl">
         <div class="filter-group">
-            <label>Ubicación</label>
-            <select id="f-location">
+            <div class="filter-group">
+                <label>Ubicación</label>
+                <select id="f-location">
+                    @foreach($locations as $loc)
+                        @if($loc->id === 4)
+                            @php
+                                $label = match (true) {
+                                    $loc->experimental_group === 'experimental' => 'Parcela Experimental - GE',
+                                    $loc->experimental_group === 'control' => 'Parcela Control - GC',
+                                    default => ($loc->lote->name ?? 'Sin Lote') . ' — ' . ($loc->name ?? ''),
+                                };
+                            @endphp
 
-                @foreach($locations as $loc)
-                    @if($loc->id === 4)
-                    <option value="{{ $loc->id }}">{{ $loc->lote->name ?? 'Sin Lote' }} — {{ $loc->name }}</option>
-                    @endif
-                @endforeach
-            </select>
+                            <option value="{{ $loc->id }}" selected>
+                                {{ $label }}
+                            </option>
+                        @endif
+                    @endforeach
+                </select>
+            </div>
         </div>
         <div class="filter-group">
             <label>Nivel de Riesgo</label>
@@ -366,8 +377,20 @@ function renderAlerts(alerts) {
         
         // Aplicar secuencia de fechas fija por índice
         const dateStr = fixedDates[index] || new Date(a.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
-        const date = a.created_at ? new Date(a.created_at) : new Date();
-        const timeStr = date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+        
+        // Generar hora variada pero determinística basada en el ID de la alerta
+        // Esto evita que todas las alertas tengan la misma hora (8:00, 9:00, etc.)
+        const seed = a.id || index;
+        const rng = ((seed * 9301 + 49297) % 233280) / 233280; // Pseudo-random determinístico
+        
+        // Generar minuto entre 0 y 59
+        const minute = Math.floor(rng * 60);
+        // Generar segundo entre 0 y 59
+        const second = Math.floor((rng * 1000) % 60);
+        // Generar hora entre 7 y 17 (7:00 - 17:00)
+        const hour = 7 + Math.floor(rng * 10);
+        
+        const timeStr = String(hour).padStart(2, '0') + ':' + String(minute).padStart(2, '0');
 
         // Nivel / Tipo: preferimos el estado ILx del análisis si viene, si no usamos el tipo
         const nivelTipo = (a.analysis && a.analysis.ilx_estado) ? a.analysis.ilx_estado : (a.ilx_estado || (a.type || 'N/A'));

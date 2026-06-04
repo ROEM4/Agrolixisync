@@ -83,7 +83,17 @@
         <div class="lote-card">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;">
                 <div>
-                    <p class="lote-name">{{ $lote->name }}</p>
+                    <p class="lote-name">
+                        @php
+                            $nombreMostrar = match($lote->name) {
+                                'LOTE-01' => 'Planta de Palto - GC',
+                                'Auto - ESP32-G1' => 'Planta de Palto - GE',
+                                default => $lote->name,
+                            };
+                        @endphp
+
+                        {{ $nombreMostrar }}
+                    </p>
                     <p class="lote-crop">
                         @switch($lote->crop_type)
                             @case('palta')    🥑 Palta @break
@@ -101,7 +111,7 @@
             @endif
 
             <div class="locations-list">
-                <div class="loc-label">📍 Ubicaciones ({{ $lote->locations->count() }})</div>
+                <div class="loc-label">📍 Ubicación ({{ $lote->locations->count() }})</div>
                 @if($lote->locations->count())
                     <ul>
                         @foreach($lote->locations as $loc)
@@ -117,8 +127,7 @@
 
             <div class="lote-actions">
                 @if($lote->locations->first())
-                <a href="{{ route('dashboard') }}?location={{ $lote->locations->first()->id }}"
-                   class="btn-sm-dash">📊 Ver en Dashboard</a>
+                
                 @endif
             </div>
         </div>

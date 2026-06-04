@@ -237,16 +237,30 @@
 <div class="glass-card mb-12">
     <div class="filter-section rounded-t-2xl">
         <div class="filter-group">
-            <label>Ubicación / Subparcela</label>
-            <select id="f-location" onchange="changeFilter('location')">
-                @foreach($locations as $loc)
-                    @if(in_array($loc->id, [3, 4]))
-                    <option value="{{ $loc->id }}" {{ $location_id == $loc->id ? 'selected' : '' }}>
-                        {{ $loc->lote->name ?? 'Sin Lote' }} — {{ $loc->name }}
-                    </option>
-                    @endif
-                @endforeach
-            </select>
+            <label>Ubicación</label>
+                <select id="f-location" onchange="changeFilter('location')">
+                    @foreach($locations as $loc)
+
+                        @if(in_array($loc->id, [3, 4]))
+
+                            @php
+                                $label = match (true) {
+                                    $loc->id == 3 => 'Planta de Palto - GC',
+                                    $loc->id == 4 => 'Planta de Palto - GE',
+                                    $loc->experimental_group === 'control' => 'Planta de Palto - GC',
+                                    $loc->experimental_group === 'experimental' => 'Planta de Palto - GE',
+                                    default => ($loc->lote->name ?? 'Sin Lote') . ' — ' . ($loc->name ?? ''),
+                                };
+                            @endphp
+
+                            <option value="{{ $loc->id }}" {{ $location_id == $loc->id ? 'selected' : '' }}>
+                                {{ $label }}
+                            </option>
+
+                        @endif
+
+                    @endforeach
+                </select>
         </div>
         <div class="filter-group">
             <label>Período</label>
@@ -273,10 +287,9 @@
                     <th class="px-6 py-4">Fecha</th>
                     <th class="px-6 py-4">Tiempo Inicial (Ti)</th>
                     <th class="px-6 py-4">Tiempo Final (Tf)</th>
-                    <th class="px-6 py-4">Subparcela</th>
+                    <th class="px-6 py-4">Planta de Palto</th>
                     <th class="px-6 py-4">Tiempo Promedio</th>
                     <th class="px-6 py-4 text-center font-medium">Eventos</th>
-                    <th class="px-6 py-4 text-center">Acciones</th>
                 </tr>
             </thead>
             <tbody id="detection-body">
@@ -311,10 +324,10 @@
                             <td>
                                 <div class="px-6 py-4 text-center font-medium">{{ $day['cantidad_eventos'] }}</div>
                             </td>
-                            <td class="px-6 py-4 text-center">
+                            <td class="px-6 py-4 text-center" style="display: none;">
                                 @if(isset($day['tipo_entrada']) && $day['tipo_entrada'] === 'manual')
                                     @php $recId = isset($day['id']) ? $day['id'] : $day['numero']; @endphp
-                                    <button onclick="openEditModal({{ $recId }}, '{{ $day['subparcela'] }}', '{{ $day['fecha'] }}', '{{ \Carbon\Carbon::parse($day['tiempo_inicial'])->format('H:i:s') }}', '{{ \Carbon\Carbon::parse($day['tiempo_final'])->format('H:i:s') }}')" class="text-blue-500 hover:text-blue-700" title="Modificar"><i class="fas fa-edit"></i></button>
+                                    <button class="text-blue-500 hover:text-blue-700" title="Modificar"><i class="fas fa-edit"></i></button>
                                 @else
                                     <span class="text-gray-400" title="Registro automático no modificable">-</span>
                                 @endif
@@ -376,9 +389,17 @@
                     <option value="">Seleccione una subparcela de control...</option>
                     @foreach($locations as $loc)
                         @if($loc->experimental_group === 'control' && in_array($loc->id, [3, 4]))
-                            <option value="{{ $loc->id }}" {{ $location_id == $loc->id ? 'selected' : '' }}>
-                                {{ $loc->lote->name ?? 'Sin Lote' }} — {{ $loc->name }}
-                            </option>
+                        @php
+                            $label = match ($loc->id) {
+                                3 => 'Planta de Palto - GC (Control)',
+                                4 => 'Planta de Palto - GE (Experimental)',
+                                default => ($loc->lote->name ?? 'Sin Lote') . ' — ' . ($loc->name ?? ''),
+                            };
+                        @endphp
+
+                        <option value="{{ $loc->id }}" {{ $location_id == $loc->id ? 'selected' : '' }}>
+                            {{ $label }}
+                        </option>
                         @endif
                     @endforeach
                 </select>

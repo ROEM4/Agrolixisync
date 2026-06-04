@@ -80,7 +80,7 @@
                 <select id="location-selector" class="w-full md:min-w-[260px] p-2.5 border-2 border-slate-200 rounded-lg text-sm font-bold text-slate-700 bg-slate-50 focus:border-emerald-500 outline-none transition-colors">
                     <option value="">-- Seleccionar Lote --</option>
                     @foreach($locations as $loc)
-                        <option value="{{ $loc->id }}" {{ request()->query('location_id') == $loc->id ? 'selected' : '' }}>{{ $loc->lote->name ?? $loc->name }} — {{ $loc->name }}</option>
+                        <option value="{{ $loc->id }}" {{ request()->query('location_id') == $loc->id ? 'selected' : '' }}>{{ $loc->name }}</option>
                     @endforeach
                 </select>
             </div>
@@ -162,7 +162,7 @@
             <div class="industrial-card" id="card-ilx" style="border:2px solid #a78bfa;">
                 <div style="display:flex; justify-content:space-between; margin-bottom:0.75rem;">
                     <div>
-                        <div style="font-size:0.8rem; font-weight:800; color:#7c3aed; text-transform:uppercase;">⚗️ ILx — Índice de Lixiviación</div>
+                        <div style="font-size:0.8rem; font-weight:800; color:#7c3aed; text-transform:uppercase;">⚗️ NLx — Nivel de Lixiviación</div>
                         <div style="font-size:0.65rem; color:#94a3b8; font-weight:600; margin-top:2px;">CE_p / CE_s · Indicador principal v3</div>
                     </div>
                     <div id="trend-ilx" style="font-weight:900; font-size:1.2rem; color:#94a3b8;">-</div>
@@ -229,22 +229,20 @@
                 <div style="font-size:1.6rem; font-weight:800; color:#0f172a; font-family:var(--font-mono);" id="kpi-delta">--<span style="font-size:0.8rem; color:#94a3b8; font-weight:600;">dS/m</span></div>
                 <div style="font-size:0.65rem; color:#94a3b8; margin-top:4px;">Positivo → CE_s > CE_p</div>
             </div>
-            {{-- ΔCE Temporal --}}
-            <div class="mini-card" style="border-left-color:#8b5cf6;">
-                <div style="font-size:0.7rem; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:0.3rem;">ΔCE Temporal (vs. anterior)</div>
-                <div style="font-size:1.6rem; font-weight:800; color:#0f172a; font-family:var(--font-mono);" id="kpi-delta-temporal">--<span style="font-size:0.8rem; color:#94a3b8; font-weight:600;">dS/m</span></div>
-                <div style="font-size:0.65rem; color:#94a3b8; margin-top:4px;">Tendencia CE superficial</div>
-            </div>
         </div>
 
 
 
-    {{-- DEBUG BAR (Opcional, minimizado en footer) --}}
-    <div id="debug-bar" style="margin-top:2rem; background:#0f172a; color:#38bdf8; border-radius:6px; padding:0.5rem 1rem; font-family:var(--font-mono); font-size:0.75rem; display:none; justify-content:space-between; opacity:0.8;">
-        <div><span>DEBUG:</span> <span id="dbg-cycles">0</span> cyc | <span id="dbg-new">0</span> new | id:<span id="dbg-id">--</span> | streak:<span id="dbg-streak">0</span></div>
+    {{-- DEBUG BAR --}}
+    <div id="debug-bar" hidden>
+        <div>
+            <span>DEBUG:</span>
+            <span id="dbg-cycles">0</span> cyc |
+            <span id="dbg-new">0</span> new |
+            id:<span id="dbg-id">--</span> |
+            streak:<span id="dbg-streak">0</span>
+        </div>
     </div>
-
-</div>
 @endsection
 
 @push('scripts')

@@ -47,25 +47,64 @@ class ReadingController extends Controller
             $validated = $request->validate($this->normalizer->rules());
             $validated['ts'] = Carbon::parse($validated['ts'])->utc()->toIso8601String();
 
-            $dto    = SensorPayloadDTO::fromValidated($validated);
-            $result = $this->ingestion->ingest($dto);
+            $dto = SensorPayloadDTO::fromValidated($validated);
 
-            // Análisis de lixiviación solo en lecturas nuevas (no duplicados)
+            // 🔥 LIMPIEZA DEL DEVICE CODE (IMPORTANTE)
+            $device = $dto->device;
+            $device = preg_replace('/^Auto-[^-]+--/', '', $device);
+            $device = str_replace('--', '-', $device);
+
+            $result = $this->ingestion->ingest(
+                new SensorPayloadDTO(
+                    device: $device,
+                    ts: $dto->ts,
+                    ce_s: $dto->ce_s,
+                    ce_p: $dto->ce_p,
+                    hum_s: $dto->hum_s,
+                    hum_p: $dto->hum_p,
+                    temp_s: $dto->temp_s,
+                    temp_p: $dto->temp_p,
+                )
+            );
+
             if ($result['status'] === 'success') {
-                $sensors = app(\App\Services\IoTAutoProvisioningService::class)->resolveSensors($dto->device);
-                $this->lixiviation->analyze($sensors['superficial'], $sensors['profundo']);
-                $this->deviceManager->heartbeat($dto->device, $result['location_id']);
+
+                $sensors = app(\App\Services\IoTAutoProvisioningService::class)
+                    ->resolveSensors($device);
+
+                $this->lixiviation->analyze(
+                    $sensors['superficial'],
+                    $sensors['profundo']
+                );
+
+                $this->deviceManager->heartbeat($device, $result['location_id']);
             }
 
-            Log::info('POST /api/sensor/data', ['device' => $dto->device, 'status' => $result['status']]);
+            Log::info('POST /api/sensor/data', [
+                'device' => $device,
+                'status' => $result['status']
+            ]);
 
             return response()->json($result, 200);
 
         } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json(['status' => 'validation_error', 'ack' => false, 'errors' => $e->errors()], 422);
+            return response()->json([
+                'status' => 'validation_error',
+                'ack' => false,
+                'errors' => $e->errors()
+            ], 422);
+
         } catch (\Exception $e) {
-            Log::error('POST /api/sensor/data error', ['error' => $e->getMessage(), 'line' => $e->getLine()]);
-            return response()->json(['status' => 'error', 'ack' => false, 'message' => 'Server error'], 500);
+            Log::error('POST /api/sensor/data error', [
+                'error' => $e->getMessage(),
+                'line' => $e->getLine()
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'ack' => false,
+                'message' => 'Server error'
+            ], 500);
         }
     }
 

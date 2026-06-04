@@ -195,18 +195,18 @@
 
     {{-- Análisis --}}
     <div class="nav-divider"></div>
-    <div class="nav-section">Tesis & Análisis</div>
+    <div class="nav-section">Indicadores</div>
     <a class="nav-link {{ request()->routeIs('analisis') ? 'active' : '' }}"
        href="{{ route('analisis') }}">
-        <i class="fas fa-microscope"></i> Análisis (PDS)
+        <i class="fas fa-microscope"></i> Porcentaje de Precisión de detección
     </a>
     <a class="nav-link {{ request()->routeIs('lixiviacion') ? 'active' : '' }}"
        href="{{ route('lixiviacion') }}">
-        <i class="fas fa-chart-pie"></i> Índice de Lixiviación
+        <i class="fas fa-chart-pie"></i> Nivel de Lixiviación
     </a>
     <a class="nav-link {{ request()->routeIs('detection_time') ? 'active' : '' }}"
        href="{{ route('detection_time') }}">
-        <i class="fas fa-hourglass-end"></i> Tiempo de Detección
+        <i class="fas fa-hourglass-end"></i> Tiempo promedio de Detección
     </a>
 
     {{-- Alertas e Histórico --}}
@@ -217,7 +217,7 @@
     </a>
     <a class="nav-link {{ request()->routeIs('historico') ? 'active' : '' }}"
        href="{{ route('historico') }}">
-        <i class="fas fa-history"></i> Histórico
+        <i class="fas fa-history"></i> Historial de Registros
     </a>
 
     {{-- Gestión --}}
