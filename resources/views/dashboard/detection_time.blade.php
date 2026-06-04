@@ -165,9 +165,11 @@
         <p>Análisis del tiempo promedio de respuesta en detección de eventos</p>
     </div>
     <div style="display:flex; gap: 0.75rem;">
+        @if($location_id == 3)
         <button onclick="openManualModal()" class="btn btn-success shadow-sm" style="border-radius:10px; font-weight:600; font-size:0.85rem; background: var(--accent-green); color: white; border: none; padding: 0 1rem; display: flex; align-items: center; gap: 6px; cursor: pointer;">
             <i class="fas fa-plus"></i> Ingresar Datos Manuales
         </button>
+        @endif
         <a href="{{ route('detection_time.export', ['location_id' => $location_id, 'filter' => $filter]) }}" class="btn btn-light shadow-sm" style="border-radius:10px; font-weight:600; font-size:0.85rem; text-decoration: none; display: flex; align-items: center; justify-content: center; padding: 0.5rem 1rem;">
             <i class="fas fa-download"></i> Descargar
         </a>
