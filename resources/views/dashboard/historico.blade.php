@@ -101,9 +101,8 @@
         <label>Lote / Ubicación</label>
         <select id="h-location">
             @foreach($locations as $loc)
-                @if(str_contains(strtolower($loc->name), 'experimental'))
-                    <option value="{{ $loc->id }}" selected>Auto - ESP32-G1- Parcela Experimental (AgrolixiSync)</option>
-                    @break
+                @if(str_contains(strtolower($loc->name), 'experimental') || str_contains(strtolower($loc->name), 'parcela'))
+                    <option value="{{ $loc->id }}" selected>{{ $loc->name }}</option>
                 @endif
             @endforeach
         </select>
@@ -500,6 +499,13 @@ if (sel && sel.value) {
 } else if (saved && sel && sel.querySelector(`option[value="${saved}"]`)) {
     sel.value = saved;
     loadHistorico();
+}
+
+// Guardar ubicación cuando cambia
+if (sel) {
+    sel.addEventListener('change', () => {
+        localStorage.setItem('agro_loc', sel.value);
+    });
 }
 </script>
 @endpush
