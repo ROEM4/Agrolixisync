@@ -7,7 +7,7 @@ use App\Models\Analysis;
 use App\Models\Reading;
 use App\Models\Sensor;
 use App\Modules\AnalyticsEngine\LixiviationService;
-use App\Modules\DeviceManager\DeviceManagerService;
+//use App\Modules\DeviceManager\DeviceManagerService;
 use App\Modules\SensorRealtime\IngestionService;
 use App\Modules\SensorRealtime\NormalizerService;
 use App\Modules\SensorRealtime\SensorPayloadDTO;
@@ -29,10 +29,9 @@ use Illuminate\Support\Facades\Log;
 class ReadingController extends Controller
 {
     public function __construct(
-        private readonly NormalizerService    $normalizer,
-        private readonly IngestionService     $ingestion,
-        private readonly LixiviationService   $lixiviation,
-        private readonly DeviceManagerService $deviceManager,
+        private readonly NormalizerService  $normalizer,
+        private readonly IngestionService   $ingestion,
+        private readonly LixiviationService $lixiviation,
     ) {}
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -77,7 +76,7 @@ class ReadingController extends Controller
                     $sensors['profundo']
                 );
 
-                $this->deviceManager->heartbeat($device, $result['location_id']);
+               // $this->deviceManager->heartbeat($device, $result['location_id']);
             }
 
             Log::info('POST /api/sensor/data', [

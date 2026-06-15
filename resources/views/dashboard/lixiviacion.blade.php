@@ -12,12 +12,11 @@
     }
 
     .glass-card {
-        background: var(--glass-bg);
-        backdrop-filter: blur(12px);
-        border: 1px solid var(--glass-border);
-        border-radius: 20px;
-        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.04);
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        backdrop-filter: none;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+        border-radius: 14px;
     }
 
     .glass-card:hover {
@@ -103,77 +102,160 @@
         border-radius: 50%; background: inherit; animation: pulse-ring 1.5s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
     }
 
-    /* SCADA Colors for mirror cards */
     .border-crit { border-left: 6px solid #ef4444; }
     .border-warn { border-left: 6px solid #f59e0b; }
     .border-ok   { border-left: 6px solid #22c55e; }
     .border-info { border-left: 6px solid #3b82f6; }
+
+    /* ===== MODAL ESTILO ACADÉMICO ===== */
+    .eval-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.65);
+        backdrop-filter: blur(6px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        padding: 1rem;
+    }
+    .eval-overlay.active { display: flex; }
+
+    .eval-box {
+        background: #fff;
+        border-radius: 24px;
+        width: 100%;
+        max-width: 520px;
+        padding: 2rem;
+        box-shadow: 0 25px 60px rgba(0,0,0,0.25);
+        animation: evalPop 0.25s ease-out;
+    }
+    @keyframes evalPop {
+        from { transform: scale(0.92); opacity: 0; }
+        to   { transform: scale(1);    opacity: 1; }
+    }
+
+    .eval-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid #f1f5f9;
+    }
+    .eval-header h3 {
+        font-weight: 800;
+        font-size: 1.15rem;
+        color: #0f172a;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .eval-close {
+        background: #f1f5f9;
+        border: none;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        font-weight: 900;
+        color: #64748b;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .eval-close:hover { background: #e2e8f0; color: #0f172a; }
 </style>
 
 <div class="page-container">
     {{-- Header Section --}}
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
         <div>
-            <div class="flex items-center gap-2 mb-1">
-                <div class="live-dot"></div>
-                <span class="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Monitoreo en Tiempo Real</span>
-            </div>
             <h1 class="text-4xl font-black text-slate-900 tracking-tight">Nivel de Lixiviación</h1>
-            <div class="mt-8 text-center text-[10px] font-bold text-slate-400 italic">
+            <div class="mt-2 text-[10px] font-bold text-slate-400 italic">
                 * El Nivel de Lixiviación mide la relación entre nutrientes profundos y superficiales.
-            </div>
-        </div>
-
-        <div class="flex flex-wrap gap-3 items-center">
-            <div class="flex bg-white p-1.5 rounded-2xl shadow-md border border-slate-100">
-                @foreach(['24h', '7d', '14d', '30d', 'all'] as $f)
-                <a href="{{ route('lixiviacion', ['location_id' => $location_id, 'filter' => $f]) }}" 
-                   class="filter-btn {{ $filter == $f ? 'active' : '' }}">{{ strtoupper($f) }}</a>
-                @endforeach
             </div>
         </div>
     </div>
 
     @if(session('success'))
-        <div class="alert alert-success" style="background-color: #dcfce7; border: 1px solid #bbf7d0; color: #16a34a; padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 8px;">
+        <div style="background-color: #dcfce7; border: 1px solid #bbf7d0; color: #16a34a; padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 8px;">
             <i class="fas fa-check-circle" style="font-size: 1.2rem;"></i>
             <span style="font-weight: 600; font-size: 0.9rem;">{{ session('success') }}</span>
         </div>
     @endif
 
-    @if($errors->any())
-        <div class="alert alert-danger" style="background-color: #fee2e2; border: 1px solid #fecaca; color: #dc2626; padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem;">
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 0.5rem; font-weight: 700; font-size: 0.9rem;">
-                <i class="fas fa-exclamation-circle" style="font-size: 1.2rem;"></i>
-                <span>Por favor corrige los siguientes errores:</span>
-            </div>
-            <ul style="margin: 0; padding-left: 1.5rem; font-size: 0.85rem; font-weight: 600;">
-                @foreach($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
+    @if(session('error'))
+        <div style="background-color: #fee2e2; border: 1px solid #fecaca; color: #dc2626; padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem;">
+            <span style="font-weight: 600;">{{ session('error') }}</span>
         </div>
     @endif
 
-    {{-- Controls Row --}}
+    {{-- ═══════════════════════════════════════════════════════════════ --}}
+    {{-- 🎯 SELECTOR DE MODO (IoT / Manual) - ÚNICO                   --}}
+    {{-- ═══════════════════════════════════════════════════════════════ --}}
+    <div class="mb-6">
+        <label class="block text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest">📡 Modo de Visualización</label>
+        <div class="flex gap-3">
+            @php
+                $defaultIotLoc = $lotesGE->first()?->locations->first()?->id;
+                $defaultManualLoc = $lotesGC->first()?->locations->first()?->id;
+            @endphp
+            
+            <a href="{{ route('lixiviacion', ['mode' => 'iot', 'location_id' => ($location_id && !$isCtrl) ? $location_id : $defaultIotLoc, 'filter' => $filter]) }}" 
+               class="flex-1 max-w-xs px-6 py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-3 {{ $mode === 'iot' ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-200' : 'bg-white text-slate-600 border-2 border-slate-200 hover:border-emerald-300' }}">
+                <i class="fas fa-robot text-xl"></i>
+                <div class="text-left">
+                    <div class="text-xs uppercase tracking-wider">Sensores IoT</div>
+                    <div class="text-[10px] font-medium opacity-80">Datos en tiempo real</div>
+                </div>
+            </a>
+            
+            <a href="{{ route('lixiviacion', ['mode' => 'manual', 'location_id' => ($location_id && $isCtrl) ? $location_id : $defaultManualLoc, 'filter' => $filter]) }}" 
+               class="flex-1 max-w-xs px-6 py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-3 {{ $mode === 'manual' ? 'bg-amber-600 text-white shadow-xl shadow-amber-200' : 'bg-white text-slate-600 border-2 border-slate-200 hover:border-amber-300' }}">
+                <i class="fas fa-user-edit text-xl"></i>
+                <div class="text-left">
+                    <div class="text-xs uppercase tracking-wider">Registro Manual</div>
+                    <div class="text-[10px] font-medium opacity-80">Datos de campo</div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    {{-- ═══════════════════════════════════════════════════════════════ --}}
+    {{-- 🌳 SELECTOR DE PLANTA (FILTRA SEGÚN MODO)                     --}}
+    {{-- ═══════════════════════════════════════════════════════════════ --}}
     <div class="flex flex-col lg:flex-row gap-6 mb-10 items-end">
         <div class="flex-grow max-w-xl">
             <form method="GET" action="{{ route('lixiviacion') }}" id="location-form">
                 <input type="hidden" name="filter" value="{{ $filter }}">
-                <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">📍 Seleccionar Ubicación</label>
-                @php
-                    $optCtrl = $locations->where('experimental_group', 'control')->first();
-                    $optExp  = $locations->where('experimental_group', 'experimental')
-                                         ->filter(fn($l) => str_contains(strtolower($l->name), 'experimental'))
-                                         ->first();
-                @endphp
+                <input type="hidden" name="mode" value="{{ $mode }}">
+                <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">
+                    🌳 Seleccionar Planta de Palto — {{ $mode === 'iot' ? 'Grupo Experimental' : 'Grupo Control' }}
+                </label>
                 <select name="location_id" id="location-selector" onchange="this.form.submit()" 
-                        class="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-emerald-500 transition-all shadow-sm">
-                    @if($optCtrl)
-                        <option value="{{ $optCtrl->id }}" {{ $location_id == $optCtrl->id ? 'selected' : '' }}>Planta de palto - GC</option>
-                    @endif
-                    @if($optExp)
-                        <option value="{{ $optExp->id }}" {{ $location_id == $optExp->id ? 'selected' : '' }}>Planta de palto - GE</option>
+                        class="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-{{ $mode === 'iot' ? 'emerald' : 'amber' }}-500 transition-all shadow-sm">
+                    
+                    @if($mode === 'iot')
+                        <optgroup label="🔵 GRUPO EXPERIMENTAL (IoT)">
+                            @foreach($lotesGE as $lote)
+                                @php $loc = $lote->locations->first(); @endphp
+                                @if($loc)
+                                    <option value="{{ $loc->id }}" {{ $location_id == $loc->id ? 'selected' : '' }}>
+                                        🌳 {{ $lote->name }} (Planta {{ $lote->plant_number }})
+                                    </option>
+                                @endif
+                            @endforeach
+                        </optgroup>
+                    @else
+                        <optgroup label="🟢 GRUPO CONTROL (Manual)">
+                            @foreach($lotesGC as $lote)
+                                @php $loc = $lote->locations->first(); @endphp
+                                @if($loc)
+                                    <option value="{{ $loc->id }}" {{ $location_id == $loc->id ? 'selected' : '' }}>
+                                        🌳 {{ $lote->name }} (Planta {{ $lote->plant_number }})
+                                    </option>
+                                @endif
+                            @endforeach
+                        </optgroup>
                     @endif
                 </select>
             </form>
@@ -190,60 +272,44 @@
         </div>
     </div>
 
-    {{-- Mirror Cards (Real-time / Manual for Control) --}}
+    {{-- ═══════════════════════════════════════════════════════════════ --}}
+    {{-- 🎯 PANEL SUPERIOR: MODO MANUAL O IoT                          --}}
+    {{-- ═══════════════════════════════════════════════════════════════ --}}
     @if(isset($selectedLocation))
-        @php $isCtrl = $selectedLocation->experimental_group === 'control'; @endphp
-        <div class="mb-8 p-8 {{ $isCtrl ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200' }} border-2 rounded-3xl shadow-sm">
+        <div class="mb-8 p-8 rounded-3xl border {{ $mode === 'manual' ? 'border-amber-200/70 bg-gradient-to-br from-amber-50 to-white shadow-md shadow-amber-100/40' : 'border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white shadow-md shadow-emerald-100/40' }}">
             <div class="flex items-center justify-between mb-6">
                 <div class="flex items-center gap-3">
-                    <span class="p-3 {{ $isCtrl ? 'bg-amber-500' : 'bg-emerald-500' }} text-white rounded-2xl shadow-lg">
-                        <i class="fas {{ $isCtrl ? 'fa-user-edit' : 'fa-robot' }}"></i>
+                    <span class="p-3 {{ $mode === 'manual' ? 'bg-amber-500' : 'bg-emerald-500' }} text-white rounded-2xl shadow-lg">
+                        <i class="fas {{ $mode === 'manual' ? 'fa-user-edit' : 'fa-robot' }}"></i>
                     </span>
                     <div>
-                        <h3 class="text-xl font-black {{ $isCtrl ? 'text-amber-800' : 'text-emerald-800' }}">
-                            {{ $isCtrl ? 'Entrada Manual — Grupo Control' : 'Monitoreo del Grupo Experimental' }}
+                        <h3 class="text-xl font-black {{ $mode === 'manual' ? 'text-amber-800' : 'text-emerald-800' }}">
+                            {{ $mode === 'manual' ? '📝 Modo Manual — ' : '📡 Modo IoT — ' }}{{ $selectedLocation->lote->name ?? 'N/D' }}
                         </h3>
-                        <p class="text-sm font-medium {{ $isCtrl ? 'text-amber-600' : 'text-emerald-600' }}">
-                            {{ $isCtrl ? 'Ingrese las lecturas manuales del conductimetro digital' : 'Datos recolectados por sensores IoT en tiempo real.' }}
+                        <p class="text-sm font-medium {{ $mode === 'manual' ? 'text-amber-600' : 'text-emerald-600' }}">
+                            {{ $mode === 'manual' ? 'Ingrese las lecturas manuales del conductímetro digital' : 'Datos recolectados por sensores IoT en tiempo real.' }}
                         </p>
                     </div>
                 </div>
-                @if(!$isCtrl)
+                
+                @if($mode === 'manual')
+                    <button type="button" onclick="openManualModal()" class="px-5 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl font-black text-sm shadow-xl shadow-amber-200 transform hover:-translate-y-1 transition-all flex items-center gap-2">
+                        <i class="fas fa-plus"></i> NUEVO REGISTRO MANUAL
+                    </button>
+                @else
                     <div class="px-4 py-2 bg-white rounded-xl border border-emerald-100 flex items-center gap-2">
                         <div class="live-dot"></div>
                         <span class="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Sensores Activos</span>
                     </div>
                 @endif
             </div>
-
-            @if($isCtrl)
-                <form action="{{ route('lixiviacion.store_manual') }}" method="POST" id="manual-lix-form" class="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    @csrf
-                    <input type="hidden" name="location_id" value="{{ $location_id }}">
-                    <div class="md:col-span-1">
-                        <label class="block text-[10px] font-black text-amber-600 uppercase mb-2 tracking-widest">CE Superficial (dS/m)</label>
-                        <input type="number" step="0.001" name="conductivity_superficial" id="manual-ce-sup" oninput="updateManualCards()"
-                               class="w-full p-4 bg-white border-2 border-amber-100 rounded-2xl font-black text-slate-700 outline-none focus:border-amber-500 transition-all shadow-inner" placeholder="0.000" required>
-                    </div>
-                    <div class="md:col-span-1">
-                        <label class="block text-[10px] font-black text-amber-600 uppercase mb-2 tracking-widest">CE Profunda (dS/m)</label>
-                        <input type="number" step="0.001" name="conductivity_profundo" id="manual-ce-prof" oninput="updateManualCards()"
-                               class="w-full p-4 bg-white border-2 border-amber-100 rounded-2xl font-black text-slate-700 outline-none focus:border-amber-500 transition-all shadow-inner" placeholder="0.000" required>
-                    </div>
-                    <div class="md:col-span-2 flex items-end">
-                        <button type="submit" class="w-full py-4 bg-amber-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-amber-200 hover:bg-amber-700 transform hover:-translate-y-1 transition-all flex items-center justify-center gap-3">
-                            <i class="fas fa-save"></i> GUARDAR REGISTRO MANUAL
-                        </button>
-                    </div>
-                </form>
-            @endif
         </div>
     @endif
 
-
-
+    {{-- ═══════════════════════════════════════════════════════════════ --}}
+    {{-- 📊 CARDS DE INDICADORES                                       --}}
+    {{-- ═══════════════════════════════════════════════════════════════ --}}
     <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-        {{-- CE Superficial --}}
         <div class="glass-card p-8 border-l-4 border-blue-500" id="card-ce-sup">
             <div class="kpi-title">CE Superficial (20cm)</div>
             <div class="flex items-baseline mb-4">
@@ -255,7 +321,6 @@
             </div>
         </div>
 
-        {{-- CE Profunda --}}
         <div class="glass-card p-8 border-l-4 border-emerald-500" id="card-ce-prof">
             <div class="kpi-title">CE Profunda (60cm)</div>
             <div class="flex items-baseline mb-4">
@@ -267,7 +332,6 @@
             </div>
         </div>
 
-        {{-- ILx --}}
         <div class="glass-card p-8 border-l-4 border-indigo-500" id="card-ilx">
             <div class="kpi-title">Nivel de Lixiviación</div>
             <div class="flex items-baseline mb-4">
@@ -280,7 +344,9 @@
         </div>
     </div>
 
-    {{-- Charts Block --}}
+    {{-- ═══════════════════════════════════════════════════════════════ --}}
+    {{-- 📈 GRÁFICOS                                                   --}}
+    {{-- ═══════════════════════════════════════════════════════════════ --}}
     <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
         <div class="glass-card p-6">
             <h4 class="kpi-title">CE Superficial — Promedio Diario</h4>
@@ -296,14 +362,28 @@
         </div>
     </div>
 
-
-
-    {{-- Historical Analysis Table (Ficha de Registro IL) --}}
+    {{-- ═══════════════════════════════════════════════════════════════ --}}
+    {{-- 📋 TABLA DE REGISTROS (DATOS REALES)                          --}}
+    {{-- ═══════════════════════════════════════════════════════════════ --}}
     <div class="mb-10">
-        <h2 class="text-2xl font-black text-slate-800 mb-6 flex items-center gap-3">
-            <span class="p-3 bg-indigo-600 text-white rounded-2xl shadow-lg shadow-indigo-200">📊</span>
-            Historial de Análisis de Lixiviación
-        </h2>
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+            <h2 class="text-2xl font-black text-slate-800 flex items-center gap-3">
+                <span class="p-3 bg-indigo-600 text-white rounded-2xl shadow-lg shadow-indigo-200">📊</span>
+                Tabla de Registro del indicador Nivel de Lixiviación
+            </h2>
+            
+            {{-- Filtros de tiempo --}}
+            <div class="flex items-center">
+                <div class="inline-flex bg-white/80 backdrop-blur-md p-1 rounded-2xl shadow-sm ring-1 ring-slate-200">
+                    @foreach(['24h', '7d', '14d', '30d', 'all'] as $f)
+                        <a href="{{ route('lixiviacion', ['location_id' => $location_id, 'mode' => $mode, 'filter' => $f]) }}"
+                           class="filter-btn {{ $filter == $f ? 'active' : '' }}">
+                            {{ strtoupper($f) }}
+                        </a>
+                    @endforeach
+                </div>
+            </div>
+        </div>
         
         <div class="glass-card overflow-hidden">
             <div class="overflow-x-auto">
@@ -319,70 +399,136 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
-                        @php
-                            // Fechas fijas requeridas (15 registros)
-                            $fixedDates = [
-                                '2026-04-19','2026-04-21','2026-04-23','2026-04-25','2026-04-27','2026-04-29','2026-05-01',
-                                '2026-05-03','2026-05-07','2026-05-09','2026-05-11','2026-05-13','2026-05-15','2026-05-17','2026-05-19'
-                            ];
-
-                            $controlILs = [0.98, 1, 0.97, 0.97, 0.96, 0.98, 0.95, 1, 0.99, 1, 0.98, 1.01, 0.96, 0.96, 1];
-                            $experimentalILs = [0.93, 0.95, 1, 0.93, 0.95, 0.99, 0.97, 0.92, 1, 1, 0.92, 0.94, 0.94, 0.98, 0.93];
-
-                            $isCtrl = isset($selectedLocation) && $selectedLocation->experimental_group === 'control';
-
-                            // Nivel logic: baja <0.4, media entre 0.6 y 1.0, alta >1.0
-                            $getNivel = function(float $il) {
-                                if ($il < 0.4) return 'Baja lixiviación';
-                                if ($il >= 0.6 && $il <= 1.0) return 'Media lixiviación';
-                                if ($il > 1.0) return 'Alta lixiviación';
-                                // Para valores 0.4..0.6 mantenemos 'Media lixiviación' por defecto
-                                return 'Media lixiviación';
-                            };
-                        @endphp
-
-                        @for($i=0; $i<15; $i++)
-                            @php
-                                $date = $fixedDates[$i];
-                                $plant = 'P' . ($i+1);
-
-                                $il = $isCtrl ? ($controlILs[$i] ?? 0) : ($experimentalILs[$i] ?? 0);
-
-                                // CE_S fijo para tabla de prueba: CE_P = IL * CE_S
-                                $ce_s = 1.000;
-                                $ce_p = round($il * $ce_s, 3);
-
-                                $nivel = $getNivel((float) $il);
-                            @endphp
+                        @forelse($records as $record)
                             <tr class="hover:bg-slate-50/50 transition-colors">
-                                <td class="px-6 py-4 font-bold">{{ $plant }}</td>
-                                <td class="px-6 py-4 font-medium">{{ \Carbon\Carbon::createFromFormat('Y-m-d', $date)->format('d/m/Y') }}</td>
-                                <td class="px-6 py-4 font-mono text-blue-600">{{ number_format($ce_s, 3) }}</td>
-                                <td class="px-6 py-4 font-mono text-emerald-600">{{ number_format($ce_p, 3) }}</td>
-                                <td class="px-6 py-4">
-                                    <span class="status-badge {{ $nivel == 'Alta lixiviación' ? 'bg-red-100 text-red-700' : ($nivel == 'Baja lixiviación' ? 'bg-slate-100 text-slate-600' : 'bg-amber-100 text-amber-700') }}">{{ $nivel }}</span>
+                                <td class="px-6 py-4 font-bold">
+                                    🌳 {{ $record->lote->name ?? ($selectedLocation->lote->name ?? 'N/D') }}
                                 </td>
-                                <td class="px-6 py-4 font-mono font-black text-indigo-600">{{ number_format($il, 2) }}</td>
+                                <td class="px-6 py-4 font-medium">
+                                    {{ \Carbon\Carbon::parse($record->recorded_at)->format('d/m/Y H:i') }}
+                                </td>
+                                <td class="px-6 py-4 font-mono text-blue-600">
+                                    {{ number_format($record->ce_superficial, 3) }}
+                                </td>
+                                <td class="px-6 py-4 font-mono text-emerald-600">
+                                    {{ number_format($record->ce_profunda, 3) }}
+                                </td>
+                                <td class="px-6 py-4">
+                                    @php
+                                        $nivel = $record->nivel ?? 'Media lixiviación';
+                                        $badgeClass = match($nivel) {
+                                            'Alta lixiviación' => 'bg-red-100 text-red-700',
+                                            'Baja lixiviación' => 'bg-slate-100 text-slate-600',
+                                            default => 'bg-amber-100 text-amber-700',
+                                        };
+                                    @endphp
+                                    <span class="status-badge {{ $badgeClass }}">{{ $nivel }}</span>
+                                </td>
+                                <td class="px-6 py-4 font-mono font-black text-indigo-600">
+                                    {{ number_format($record->ilx ?? 0, 3) }}
+                                </td>
                             </tr>
-                        @endfor
+                        @empty
+                            <tr>
+                                <td colspan="6" class="px-6 py-12 text-center text-slate-300 italic font-medium">
+                                    No hay registros para esta planta en el período seleccionado.
+                                </td>
+                            </tr>
+                        @endforelse
                     </tbody>
                 </table>
             </div>
             
-            @if($analysisRecords->hasPages())
+            @if(method_exists($records, 'hasPages') && $records->hasPages())
                 <div class="px-8 py-6 bg-slate-50/50 border-t border-slate-100">
-                    {{ $analysisRecords->links() }}
+                    {{ $records->links() }}
                 </div>
             @endif
         </div>
     </div>
 </div>
+
+{{-- ═══════════════════════════════════════════════════════════════════ --}}
+{{-- 🆕 MODAL: REGISTRO MANUAL (GRUPO CONTROL)                        --}}
+{{-- ═══════════════════════════════════════════════════════════════════ --}}
+<div id="manualModal" class="eval-overlay">
+    <div class="eval-box">
+        <div class="eval-header">
+            <h3>📝 Nuevo Registro Manual — Grupo Control</h3>
+            <button type="button" class="eval-close" onclick="closeManualModal()">✕</button>
+        </div>
+
+        <p class="text-sm text-slate-600 mb-4 font-semibold">
+            Ingrese las lecturas del conductímetro digital para la planta seleccionada.
+        </p>
+
+        <form action="{{ route('lixiviacion.store_manual') }}" method="POST">
+            @csrf
+            
+            {{-- 🌳 SELECTOR DE PLANTA GC --}}
+            <div class="mb-4">
+                <label class="text-xs font-black text-slate-500 uppercase tracking-wider">🌳 Planta de palto (Grupo Control)</label>
+                <select name="lote_id" class="w-full p-3 border border-slate-200 rounded-xl mt-1 focus:ring-2 focus:ring-amber-500 focus:border-transparent" required>
+                    <option value="">Seleccione planta</option>
+                    @foreach($lotesGC as $lote)
+                        <option value="{{ $lote->id }}" {{ ($selectedLocation && $selectedLocation->lote_id == $lote->id) ? 'selected' : '' }}>
+                            🌳 {{ $lote->name }} (Planta {{ $lote->plant_number }})
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="text-xs font-black text-slate-500 uppercase tracking-wider">📅 Fecha y hora</label>
+                    <input type="datetime-local" name="recorded_at" value="{{ date('Y-m-d\TH:i') }}" class="w-full p-3 border border-slate-200 rounded-xl mt-1 focus:ring-2 focus:ring-amber-500 focus:border-transparent" required />
+                </div>
+
+                <div>
+                    <label class="text-xs font-black text-slate-500 uppercase tracking-wider">📝 Observación (opcional)</label>
+                    <input type="text" name="observacion" maxlength="255" class="w-full p-3 border border-slate-200 rounded-xl mt-1 focus:ring-2 focus:ring-amber-500 focus:border-transparent" placeholder="Ej: Medición post-riego" />
+                </div>
+
+                <div>
+                    <label class="text-xs font-black text-amber-600 uppercase tracking-wider">CE Superficial (dS/m)</label>
+                    <input type="number" step="0.001" min="0" name="conductivity_superficial" id="modal-ce-sup" oninput="updateModalILx()"
+                           class="w-full p-3 border border-amber-100 rounded-xl mt-1 focus:ring-2 focus:ring-amber-500 focus:border-transparent" placeholder="0.000" required />
+                </div>
+
+                <div>
+                    <label class="text-xs font-black text-amber-600 uppercase tracking-wider">CE Profunda (dS/m)</label>
+                    <input type="number" step="0.001" min="0" name="conductivity_profundo" id="modal-ce-prof" oninput="updateModalILx()"
+                           class="w-full p-3 border border-amber-100 rounded-xl mt-1 focus:ring-2 focus:ring-amber-500 focus:border-transparent" placeholder="0.000" required />
+                </div>
+            </div>
+
+            {{-- Preview ILx en tiempo real --}}
+            <div class="mt-4 p-4 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-xl">
+                <div class="text-[10px] font-black uppercase text-indigo-600 tracking-widest mb-1">Vista previa del cálculo</div>
+                <div class="flex items-baseline gap-2">
+                    <span class="text-xs font-bold text-slate-600">ILx =</span>
+                    <span class="text-2xl font-black text-indigo-700 font-mono" id="modal-ilx-preview">--</span>
+                    <span class="status-badge bg-indigo-50 text-indigo-600 ml-2" id="modal-nivel-preview">--</span>
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-end gap-3">
+                <button type="button" onclick="closeManualModal()" class="px-4 py-2 rounded-xl border border-slate-200 font-bold text-slate-600 hover:bg-slate-50">Cancelar</button>
+                <button type="submit" class="px-6 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-black shadow-sm flex items-center gap-2">
+                    <i class="fas fa-save"></i> Guardar Registro
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 @endsection
 
 @push('scripts')
 <script>
 let locationId = '{{ $location_id }}';
 let pollTimer = null;
+const isCtrl = @json($isCtrl ?? false);
 
 const THRESHOLDS = {
     ce_sup_max : 0.600,
@@ -391,16 +537,14 @@ const THRESHOLDS = {
 
 function classifyILx(ilx) {
     if (isNaN(ilx)) return { estado: 'SIN DATOS', icon: '⚪', level: 'none' };
-    if (ilx > 1.20) return { estado: 'LIXIVIACIÓN ALTA', icon: '🔴', level: 'crit' };
-    if (ilx > 1.05) return { estado: 'LIXIVIACIÓN', icon: '🟠', level: 'warn' };
-    if (ilx >= 0.90) return { estado: 'EQUILIBRIO', icon: '✅', level: 'ok' };
-    if (ilx >= 0.70) return { estado: 'RETENCIÓN', icon: '🔵', level: 'info' };
-    return { estado: 'ACUMULACIÓN', icon: '🟡', level: 'warn' };
+    if (ilx < 0.4) return { estado: 'BAJA LIXIVIACIÓN', icon: '🟢', level: 'low' };
+    if (ilx >= 0.6 && ilx <= 1.0) return { estado: 'MEDIA LIXIVIACIÓN', icon: '🟡', level: 'medium' };
+    if (ilx > 1.0) return { estado: 'ALTA LIXIVIACIÓN', icon: '🔴', level: 'high' };
+    return { estado: 'MEDIA LIXIVIACIÓN', icon: '🟡', level: 'medium' };
 }
 
-
 async function poll() {
-    if (!locationId) return;
+    if (!locationId || isCtrl) return;
     try {
         const res  = await fetch(`/api/readings/latest?location_id=${locationId}&_=${Date.now()}`);
         const json = await res.json();
@@ -417,7 +561,6 @@ async function poll() {
         const ilx  = (!isNaN(ce_s) && ce_s > 0 && !isNaN(ce_p)) ? ce_p / ce_s : NaN;
 
         updateCards(ce_s, ce_p, ilx);
-        
         setConn('🟢 Conectado');
         document.getElementById('last-update').textContent = new Date().toLocaleTimeString('es', {hour12:false});
     } catch (e) {
@@ -426,102 +569,167 @@ async function poll() {
 }
 
 function updateCards(ce_s, ce_p, ilx) {
-    // CE Sup
-    const elSup = document.getElementById('kpi-ce-sup');
+    const safe = (v) => (isNaN(v) ? '--' : v);
+
+    document.getElementById('kpi-ce-sup').textContent = safe(ce_s) !== '--' ? ce_s.toFixed(3) : '--';
+    document.getElementById('kpi-ce-prof').textContent = safe(ce_p) !== '--' ? ce_p.toFixed(3) : '--';
+    document.getElementById('kpi-ilx').textContent = isNaN(ilx) ? '--' : ilx.toFixed(3);
+
     const badgeSup = document.getElementById('status-ce-sup');
-    elSup.textContent = isNaN(ce_s) ? '--' : ce_s.toFixed(3);
-    if (!isNaN(ce_s)) {
-        badgeSup.textContent = ce_s > THRESHOLDS.ce_sup_max ? 'ALERTA' : 'OK';
-        badgeSup.className = `status-badge ${ce_s > THRESHOLDS.ce_sup_max ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`;
-    }
-
-    // CE Prof
-    const elProf = document.getElementById('kpi-ce-prof');
     const badgeProf = document.getElementById('status-ce-prof');
-    elProf.textContent = isNaN(ce_p) ? '--' : ce_p.toFixed(3);
-    if (!isNaN(ce_p)) {
-        badgeProf.textContent = ce_p > THRESHOLDS.ce_prof_max ? 'ALERTA' : 'OK';
-        badgeProf.className = `status-badge ${ce_p > THRESHOLDS.ce_prof_max ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`;
+    const badgeIlx = document.getElementById('status-ilx');
+
+    if (!isNaN(ce_s)) {
+        const alert = ce_s > THRESHOLDS.ce_sup_max;
+        badgeSup.textContent = alert ? 'ALERTA' : 'OK';
+        badgeSup.className = `status-badge ${alert ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`;
     }
 
-    // ILx
-    const elIlx = document.getElementById('kpi-ilx');
-    const badgeIlx = document.getElementById('status-ilx');
-    const cardIlx = document.getElementById('card-ilx');
-    elIlx.textContent = isNaN(ilx) ? '--' : ilx.toFixed(4);
+    if (!isNaN(ce_p)) {
+        const alert = ce_p > THRESHOLDS.ce_prof_max;
+        badgeProf.textContent = alert ? 'ALERTA' : 'OK';
+        badgeProf.className = `status-badge ${alert ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`;
+    }
+
     if (!isNaN(ilx)) {
         const cls = classifyILx(ilx);
-        badgeIlx.textContent = cls.estado;
         const colorMap = {
-            crit: 'bg-red-50 text-red-600',
-            warn: 'bg-amber-50 text-amber-600',
-            ok: 'bg-green-50 text-green-600',
-            info: 'bg-blue-50 text-blue-600',
+            high: 'bg-red-50 text-red-600',
+            medium: 'bg-yellow-50 text-yellow-700',
+            low: 'bg-green-50 text-green-600',
             none: 'bg-slate-50 text-slate-600'
         };
+        badgeIlx.textContent = cls.estado;
         badgeIlx.className = `status-badge ${colorMap[cls.level] || colorMap.none}`;
-        cardIlx.className = `glass-card p-8 border-l-4 ${cls.level === 'crit' ? 'border-red-500' : (cls.level === 'warn' ? 'border-amber-500' : 'border-indigo-500')}`;
     }
 }
 
 function setConn(msg) { document.getElementById('conn-text').textContent = msg; }
 
-const isExperimental = '{{ $selectedLocation->experimental_group ?? "" }}' === 'experimental';
-
-function updateManualCards() {
-    const ce_s = parseFloat(document.getElementById('manual-ce-sup')?.value) || NaN;
-    const ce_p = parseFloat(document.getElementById('manual-ce-prof')?.value) || NaN;
-    const ilx  = (!isNaN(ce_s) && ce_s > 0 && !isNaN(ce_p)) ? ce_p / ce_s : NaN;
-    updateCards(ce_s, ce_p, ilx);
-    setConn('🟡 Modo Manual');
+/* ========== MODAL DE REGISTRO MANUAL ========== */
+function openManualModal() {
+    document.getElementById('manualModal').classList.add('active');
 }
 
+function closeManualModal() {
+    document.getElementById('manualModal').classList.remove('active');
+}
+
+function updateModalILx() {
+    const ce_s = Number(document.getElementById('modal-ce-sup').value);
+    const ce_p = Number(document.getElementById('modal-ce-prof').value);
+    const ilx = (!isNaN(ce_s) && ce_s > 0 && !isNaN(ce_p)) ? ce_p / ce_s : NaN;
+    
+    document.getElementById('modal-ilx-preview').textContent = isNaN(ilx) ? '--' : ilx.toFixed(3);
+    
+    const cls = classifyILx(ilx);
+    const badge = document.getElementById('modal-nivel-preview');
+    const colorMap = {
+        high: 'bg-red-50 text-red-600',
+        medium: 'bg-yellow-50 text-yellow-700',
+        low: 'bg-green-50 text-green-600',
+        none: 'bg-slate-50 text-slate-600'
+    };
+    badge.textContent = cls.estado;
+    badge.className = `status-badge ${colorMap[cls.level] || colorMap.none}`;
+}
+
+// Inicialización
 if (locationId) {
-    if (isExperimental) {
+    if (isCtrl) {
+        setConn('🟡 Modo Manual');
+    } else {
         poll();
         pollTimer = setInterval(poll, 3000);
-    } else {
-        setConn('🟡 Modo Manual');
-        const firstRow = document.querySelector('tbody tr');
-        if (firstRow && !firstRow.querySelector('td[colspan]')) {
-            const ce_s = parseFloat(firstRow.cells[2].textContent);
-            const ce_p = parseFloat(firstRow.cells[3].textContent);
-            const ilx  = parseFloat(firstRow.cells[4].textContent);
-            
-            const inputSup = document.getElementById('manual-ce-sup');
-            const inputProf = document.getElementById('manual-ce-prof');
-            if (inputSup) inputSup.value = ce_s;
-            if (inputProf) inputProf.value = ce_p;
-            
-            updateCards(ce_s, ce_p, ilx);
-        }
     }
 }
+
+// Cerrar modal al hacer click fuera
+document.querySelectorAll('.eval-overlay').forEach(overlay => {
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) overlay.classList.remove('active');
+    });
+});
 </script>
 @endpush
 
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function(){
-    const dates = @json($datesJson ?? '[]');
-    const ceSup = @json($ceSupJson ?? '[]');
-    const ilx = @json($ilxJson ?? '[]');
-    const counts = @json($countsJson ?? '[]');
-
-    const parseDates = JSON.parse(dates);
-    const ceData = JSON.parse(ceSup);
-    const ilxData = JSON.parse(ilx);
-    const cntData = JSON.parse(counts);
+document.addEventListener('DOMContentLoaded', function () {
+    const dates   = @json($datesJson ?? []);
+    const ceSup   = @json($ceSupJson ?? []);
+    const ilx     = @json($ilxJson ?? []);
+    const counts  = @json($countsJson ?? []);
 
     const c1 = document.getElementById('lxCeSupChart');
-    if (c1) new Chart(c1, { type:'line', data:{ labels: parseDates, datasets:[{ label:'CE Superficial (dS/m)', data: ceData, borderColor:'#0ea5a0', backgroundColor:'rgba(14,165,160,0.05)', fill:true }]}, options:{ responsive:true, maintainAspectRatio:false } });
+    if (c1 && dates.length > 0) {
+        new Chart(c1, {
+            type: 'line',
+            data: {
+                labels: dates,
+                datasets: [{
+                    label: 'CE Superficial (dS/m)',
+                    data: ceSup,
+                    borderColor: '#0ea5a0',
+                    backgroundColor: 'rgba(14,165,160,0.08)',
+                    fill: true,
+                    tension: 0.35,
+                    pointRadius: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: true } },
+                scales: { y: { beginAtZero: true, ticks: { precision: 2 } } }
+            }
+        });
+    }
 
     const c2 = document.getElementById('lxIlxChart');
-    if (c2) new Chart(c2, { type:'line', data:{ labels: parseDates, datasets:[{ label:'ILx (ratio)', data: ilxData, borderColor:'#6366f1', backgroundColor:'rgba(99,102,241,0.05)', fill:true }]}, options:{ responsive:true, maintainAspectRatio:false } });
+    if (c2 && dates.length > 0) {
+        new Chart(c2, {
+            type: 'line',
+            data: {
+                labels: dates,
+                datasets: [{
+                    label: 'ILx (CEp / CEs)',
+                    data: ilx,
+                    borderColor: '#6366f1',
+                    backgroundColor: 'rgba(99,102,241,0.08)',
+                    fill: true,
+                    tension: 0.35,
+                    pointRadius: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { y: { beginAtZero: true, suggestedMin: 0, suggestedMax: 2 } }
+            }
+        });
+    }
 
     const c3 = document.getElementById('lxCountsChart');
-    if (c3) new Chart(c3, { type:'bar', data:{ labels: parseDates, datasets:[{ label:'Registros', data: cntData, backgroundColor:'#4f46e5' }]}, options:{ responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true, stepSize:1 } } } });
+    if (c3 && dates.length > 0) {
+        new Chart(c3, {
+            type: 'bar',
+            data: {
+                labels: dates,
+                datasets: [{
+                    label: 'Registros por día',
+                    data: counts,
+                    backgroundColor: '#4f46e5'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+            }
+        });
+    }
 });
 </script>
 @endpush

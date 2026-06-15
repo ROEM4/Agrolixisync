@@ -8,68 +8,113 @@ use Illuminate\Support\Facades\Auth;
 
 class LoteController extends Controller
 {
-    /**
-     * Lista todos los lotes del usuario
-     */
-    public function index()
+    public function index(Request $request)
     {
-        $lotes = Lote::where('user_id', Auth::id())
-            ->with('locations')
-            ->paginate(15);
+        $query = Lote::where('user_id', Auth::id())
+            ->with('locations');
+
+        // Filtro por grupo
+        if ($request->filled('grupo')) {
+
+            if ($request->grupo === 'GC') {
+                $query->where('experimental_group', 'control');
+            }
+
+            if ($request->grupo === 'GE') {
+                $query->where('experimental_group', 'experimental');
+            }
+        }
+
+        $lotes = $query
+            ->orderBy('plant_number', 'asc')
+            ->paginate(30)
+            ->withQueryString();
 
         return view('lotes.index', compact('lotes'));
     }
 
-    /**
-     * Muestra formulario para crear lote
-     */
     public function create()
     {
-        $cropTypes = [
-            'palta' => '🥑 Palta (Palto)',
-            'citricos' => '🍊 Cítricos',
-            'frutilla' => '🍓 Frutilla',
-            'otro' => 'Otro',
-        ];
-
-        return view('lotes.create', compact('cropTypes'));
+        return view('lotes.create');
     }
 
-    /**
-     * Almacena un nuevo lote
-     */
+    public function edit(Lote $lote)
+    {
+        if ($lote->user_id !== Auth::id()) {
+            abort(403);
+        }
+
+        $lote->load('locations');
+
+        return view('lotes.edit', compact('lote'));
+    }
+
+   public function update(Request $request, Lote $lote)
+    {
+        if ($lote->user_id !== Auth::id()) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'plant_number' => 'required|integer|min:1|max:30',
+            'experimental_group' => 'required|in:GC,GE',
+            'crop_type' => 'required|string',
+        ]);
+
+        // MAPEO GC / GE → BD
+        $validated['experimental_group'] =
+            $validated['experimental_group'] === 'GC'
+                ? 'control'
+                : 'experimental';
+
+        $lote->update($validated);
+
+        return redirect()
+            ->route('lotes.index')
+            ->with('success', 'Planta actualizada correctamente.');
+    }
+
     public function store(Request $request)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'crop_type' => 'required|string|in:palta,citricos,frutilla,otro',
-            'description' => 'nullable|string|max:1000',
+            'plant_number' => 'required|integer|min:1|max:30',
+            'experimental_group' => 'required|in:GC,GE',
+            'crop_type' => 'required|string',
+            'latitude' => 'required',
+            'longitude' => 'required',
         ]);
+
+        // 🔥 MAPEO CRÍTICO GC/GE → BD
+        $validated['experimental_group'] =
+            $validated['experimental_group'] === 'GC'
+            ? 'control'
+            : 'experimental';
 
         $validated['user_id'] = Auth::id();
 
         $lote = Lote::create($validated);
 
-        // Para diseño experimental puro:
-        // 1. Crear ubicación de CONTROL (Tradicional/Manual)
+        // Control
         $lote->locations()->create([
-            'name' => $validated['name'] . ' (Control)',
+            'name' => $lote->name . ' - Control',
             'experimental_group' => 'control',
-            'latitude' => -25.2637,
-            'longitude' => -57.5759,
+            'latitude' => $request->latitude,
+            'longitude' => $request->longitude,
             'is_active' => true,
         ]);
 
-        // 2. Crear ubicación EXPERIMENTAL (Sistema/Automatizado)
+        // Experimental
         $lote->locations()->create([
-            'name' => $validated['name'] . ' (Experimental)',
+            'name' => $lote->name . ' - Experimental',
             'experimental_group' => 'experimental',
-            'latitude' => -25.2638, // Ligera diferencia para visualización
-            'longitude' => -57.5760,
+            'latitude' => $request->latitude,
+            'longitude' => $request->longitude,
             'is_active' => true,
         ]);
 
         return redirect()->route('lotes.index')
-            ->with('success', "✅ Lote '{$lote->name}' creado con grupos Control y Experimental configurados.");
+            ->with('success', "Planta '{$lote->name}' creada correctamente.");
     }
 }

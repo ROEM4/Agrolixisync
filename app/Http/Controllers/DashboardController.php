@@ -18,9 +18,11 @@ class DashboardController extends Controller
 
     public function realtime(Request $request)
     {
+        // ✅ TRAER TODAS LAS LOCATIONS EXPERIMENTALES (GE)
         $locations = \App\Models\Location::with('lote')
-        ->where('id', 2) // 👈 tu lote fijo
-        ->get();
+            ->where('experimental_group', 'experimental')
+            ->orderBy('id')
+            ->get();
 
         $analysisRecords = Analysis::with(['location', 'lote'])
             ->when($request->query('location_id'), fn($q, $locationId) => $q->where('location_id', $locationId))
@@ -73,29 +75,5 @@ class DashboardController extends Controller
         return back()->with('success', 'Perfil actualizado correctamente.');
     }
 
-    public function export()
-    {
-        $user = Auth::user();
-        $lotes = $user->lotes;
-        $lecturas = \App\Models\EcReading::whereIn('lote_id', $lotes->pluck('id'))->get();
 
-        $filename = 'agrolixisync_lecturas_' . now()->format('Y-m-d') . '.csv';
-        $headers = [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => "attachment; filename=\"$filename\"",
-        ];
-
-        $handle = fopen('php://output', 'w');
-        fputcsv($handle, ['Fecha', 'EC (dS/m)', 'Humedad (%)']);
-        foreach ($lecturas as $l) {
-            fputcsv($handle, [
-                $l->created_at->format('Y-m-d H:i:s'),
-                $l->value,
-                $l->humidity,
-            ]);
-        }
-        fclose($handle);
-
-        return response()->stream(function () {}, 200, $headers);
-    }
 }

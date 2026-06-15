@@ -8,16 +8,19 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('lotes', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->text('description')->nullable();
-            $table->timestamps();
+        Schema::table('lotes', function (Blueprint $table) {
+            $table->integer('plant_number')->nullable()->after('id');
+            $table->enum('experimental_group', ['control', 'experimental'])
+                  ->nullable()
+                  ->after('plant_number');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('lotes');
+        Schema::table('lotes', function (Blueprint $table) {
+            $table->dropColumn(['plant_number', 'experimental_group']);
+        });
     }
 };
+?>

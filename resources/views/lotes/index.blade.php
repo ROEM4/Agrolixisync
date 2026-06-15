@@ -1,152 +1,199 @@
 @extends('layouts.app')
-@section('title', 'Lotes — AgroLixiSync')
+
+@section('title', 'Lotes')
 
 @section('content')
+
 <style>
-    .page-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem; }
-    .page-header h1 { margin:0; font-size:1.4rem; font-weight:700; color:#1a472a; }
-    .page-header p  { margin:0.25rem 0 0; font-size:0.85rem; color:#6b7280; }
+    .page-header {
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        margin-bottom:1.5rem;
+        flex-wrap:wrap;
+        gap:1rem;
+    }
+
+    .page-header h1 {
+        margin:0;
+        font-size:1.4rem;
+        font-weight:700;
+        color:#1a472a;
+    }
+
     .btn-primary {
         padding:0.6rem 1.25rem;
         background:linear-gradient(135deg,#16a34a,#15803d);
-        color:#fff; border:none; border-radius:8px;
-        font-weight:700; font-size:0.85rem; text-decoration:none;
-        display:inline-flex; align-items:center; gap:0.4rem;
-    }
-    .btn-primary:hover { opacity:0.9; color:#fff; }
-
-    .alert-success {
-        background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px;
-        padding:0.85rem 1.1rem; margin-bottom:1.25rem;
-        color:#166534; font-size:0.85rem; font-weight:600;
+        color:#fff;
+        border:none;
+        border-radius:8px;
+        font-weight:700;
+        font-size:0.85rem;
+        text-decoration:none;
     }
 
-    .lotes-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:1.25rem; }
+    .filter-bar {
+        margin-bottom:20px;
+    }
+
+    .filter-select {
+        padding:8px 12px;
+        border:1px solid #d1d5db;
+        border-radius:8px;
+        background:#fff;
+    }
+
+    .lotes-grid {
+        display:grid;
+        grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+        gap:1.25rem;
+    }
 
     .lote-card {
-        background:#fff; border-radius:10px;
+        background:#fff;
+        border-radius:10px;
         box-shadow:0 1px 6px rgba(0,0,0,0.07);
         border-left:4px solid #16a34a;
         padding:1.25rem;
-        transition:box-shadow 0.2s, transform 0.2s;
     }
-    .lote-card:hover { box-shadow:0 4px 16px rgba(0,0,0,0.12); transform:translateY(-2px); }
 
-    .lote-card .lote-name { font-size:1rem; font-weight:700; color:#1a472a; margin:0 0 0.25rem; }
-    .lote-card .lote-crop { font-size:0.8rem; color:#6b7280; margin:0; }
-    .lote-card .lote-desc { font-size:0.83rem; color:#555; margin:0.75rem 0; line-height:1.5; }
-
-    .lote-meta { font-size:0.72rem; color:#9ca3af; margin-top:0.75rem; }
-
-    .locations-list { margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid #f3f4f6; }
-    .locations-list .loc-label { font-size:0.7rem; font-weight:700; color:#6b7280; text-transform:uppercase; margin-bottom:0.4rem; }
-    .locations-list ul { margin:0; padding:0; list-style:none; }
-    .locations-list li { font-size:0.8rem; color:#6b7280; padding:0.15rem 0; }
-
-    .lote-actions { margin-top:1rem; display:flex; gap:0.5rem; }
-    .btn-sm-dash {
-        flex:1; text-align:center;
-        padding:0.45rem 0.75rem;
-        background:#0ea5e9; color:#fff;
-        border:none; border-radius:6px;
-        font-size:0.78rem; font-weight:600;
-        text-decoration:none;
+    .lote-name {
+        font-size:1rem;
+        font-weight:700;
+        color:#1a472a;
     }
-    .btn-sm-dash:hover { opacity:0.9; color:#fff; }
 
-    .empty-state {
-        text-align:center; padding:3rem 1rem;
-        background:linear-gradient(135deg,#f0fdf4,#dbeafe);
-        border:2px dashed #16a34a; border-radius:12px;
+    .lote-meta {
+        font-size:0.85rem;
+        color:#6b7280;
+        margin:0.25rem 0;
     }
-    .empty-state .icon { font-size:3rem; margin-bottom:0.75rem; }
-    .empty-state h2 { margin:0 0 0.5rem; font-size:1.2rem; font-weight:700; color:#1a472a; }
-    .empty-state p  { margin:0 0 1.25rem; color:#6b7280; font-size:0.9rem; }
+
+    .badge {
+        display:inline-block;
+        padding:0.2rem 0.5rem;
+        border-radius:6px;
+        font-size:0.75rem;
+        font-weight:600;
+    }
+
+    .badge-control {
+        background:#dcfce7;
+        color:#166534;
+    }
+
+    .badge-exp {
+        background:#dbeafe;
+        color:#1e3a8a;
+    }
+
+    .pagination-wrapper {
+        margin-top: 20px;
+    }
 </style>
 
 <div class="page-header">
     <div>
-        <h1>🌾 Gestión de Lotes</h1>
-        <p>Parcelas de cultivo y puntos de monitoreo</p>
+        <h1>🌾 Plantas registradas</h1>
+        <p>Listado del sistema</p>
     </div>
-    <a href="{{ route('lotes.create') }}" class="btn-primary">➕ Nuevo Lote</a>
+
+    <a href="{{ route('lotes.create') }}" class="btn-primary">
+        ➕ Nueva Planta
+    </a>
 </div>
 
 @if(session('success'))
-    <div class="alert-success">✅ {{ session('success') }}</div>
+    <div style="color:#166534;font-weight:600;margin-bottom:1rem;">
+        {{ session('success') }}
+    </div>
 @endif
 
-@if($lotes->count() > 0)
-    <div class="lotes-grid">
-        @foreach($lotes as $lote)
-        @if(in_array($lote->name, ['LOTE-01', 'Auto - ESP32-G1']))
-        <div class="lote-card">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                <div>
-                    <p class="lote-name">
-                        @php
-                            $nombreMostrar = match($lote->name) {
-                                'LOTE-01' => 'Planta de Palto - GC',
-                                'Auto - ESP32-G1' => 'Planta de Palto - GE',
-                                default => $lote->name,
-                            };
-                        @endphp
+<div class="filter-bar">
+    <form method="GET" action="{{ route('lotes.index') }}">
+        <label for="grupo"><strong>Filtrar por grupo:</strong></label>
 
-                        {{ $nombreMostrar }}
-                    </p>
-                    <p class="lote-crop">
-                        @switch($lote->crop_type)
-                            @case('palta')    🥑 Palta @break
-                            @case('citricos') 🍊 Cítricos @break
-                            @case('frutilla') 🍓 Frutilla @break
-                            @default          📌 {{ ucfirst($lote->crop_type ?? 'otro') }}
-                        @endswitch
-                    </p>
-                </div>
-                <span style="font-size:1.8rem;">🌾</span>
-            </div>
+        <select
+            name="grupo"
+            id="grupo"
+            class="filter-select"
+            onchange="this.form.submit()"
+        >
+            <option value="">Todos</option>
 
-            @if($lote->description)
-                <p class="lote-desc">{{ $lote->description }}</p>
-            @endif
+            <option value="GC"
+                {{ request('grupo') == 'GC' ? 'selected' : '' }}>
+                GC
+            </option>
 
-            <div class="locations-list">
-                <div class="loc-label">📍 Ubicación ({{ $lote->locations->count() }})</div>
-                @if($lote->locations->count())
-                    <ul>
-                        @foreach($lote->locations as $loc)
-                            <li>• {{ $loc->name }}</li>
-                        @endforeach
-                    </ul>
-                @else
-                    <span style="font-size:0.8rem;color:#9ca3af;font-style:italic;">Sin ubicaciones</span>
-                @endif
-            </div>
+            <option value="GE"
+                {{ request('grupo') == 'GE' ? 'selected' : '' }}>
+                GE
+            </option>
+        </select>
+    </form>
+</div>
 
-            <div class="lote-meta">Creado: {{ $lote->created_at->format('d/m/Y H:i') }}</div>
+@if($lotes->count())
 
-            <div class="lote-actions">
-                @if($lote->locations->first())
-                
-                @endif
-            </div>
-        </div>
-        @endif
-        @endforeach
+<div class="lotes-grid">
+
+@foreach($lotes as $lote)
+
+<div class="lote-card">
+
+    <div class="lote-name">
+        {{ $lote->name }}
     </div>
 
-    @if($lotes->hasPages())
-        <div style="margin-top:1.5rem;display:flex;justify-content:center;">
-            {{ $lotes->links() }}
-        </div>
-    @endif
+    <div class="lote-meta">
+        N° planta: {{ $lote->plant_number }}
+    </div>
+
+    <div class="lote-meta">
+        Grupo:
+
+        @if($lote->experimental_group === 'control')
+            <span class="badge badge-control">🟢 GC</span>
+        @else
+            <span class="badge badge-exp">🔵 GE</span>
+        @endif
+    </div>
+
+    <div class="lote-meta">
+        🌱 Cultivo: {{ $lote->crop_type }}
+    </div>
+
+    <div class="lote-meta">
+        📍 Ubicación: {{ $lote->locations->first()->name ?? 'Sin ubicación' }}
+    </div>
+    <div class="lote-meta">
+        🏷️ Device Code: {{ $lote->locations->first()->device_code ?? 'N/A' }}
+    </div>
+
+    <!-- ✅ BOTÓN EDITAR AGREGADO -->
+    <div style="margin-top:15px;">
+        <a href="{{ route('lotes.edit', $lote->id) }}"
+           class="btn-primary"
+           style="display:block;text-align:center;">
+            ✏️ Editar planta
+        </a>
+    </div>
+
+</div>
+
+@endforeach
+
+</div>
+
+<div class="pagination-wrapper">
+    {{ $lotes->links() }}
+</div>
 
 @else
-    <div class="empty-state">
-        <div class="icon">🌾</div>
-        <h2>No hay lotes configurados</h2>
-        <p>Crea tu primer lote para comenzar el monitoreo de lixiviación</p>
-        <a href="{{ route('lotes.create') }}" class="btn-primary">➕ Crear Primer Lote</a>
-    </div>
+
+<p>No hay plantas registradas para el filtro seleccionado.</p>
+
 @endif
+
 @endsection

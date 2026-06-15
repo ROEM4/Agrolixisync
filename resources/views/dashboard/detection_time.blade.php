@@ -1,4 +1,5 @@
 @extends('layouts.app')
+
 @section('title', 'Tiempo de Detección — AgroLixiSync')
 
 @section('content')
@@ -9,6 +10,45 @@
         --accent-green: #16a34a;
         --accent-blue: #3b82f6;
         --accent-purple: #9333ea;
+        --accent-amber: #d97706;
+    }
+    
+    .filter-btn {
+        padding: 6px 14px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 800;
+        letter-spacing: 0.03em;
+        color: #64748b;
+        text-decoration: none;
+        transition: all 0.25s ease;
+        position: relative;
+    }
+
+    .kpi-card { transition: all 0.3s ease; }
+    .kpi-card:hover { transform: translateY(-3px); }
+
+    .filter-btn:hover {
+        background: rgba(16, 163, 74, 0.08);
+        color: #16a34a;
+    }
+
+    .filter-btn.active {
+        background: #16a34a;
+        color: white;
+        box-shadow: 0 6px 18px rgba(22, 163, 74, 0.25);
+    }
+
+    .filter-btn.active::after {
+        content: '';
+        position: absolute;
+        bottom: -4px;
+        left: 20%;
+        width: 60%;
+        height: 2px;
+        background: #16a34a;
+        border-radius: 999px;
+        opacity: 0.6;
     }
 
     .page-header { 
@@ -20,7 +60,6 @@
     .page-header h1 { margin: 0; font-size: 1.8rem; font-weight: 800; color: #1a472a; letter-spacing: -0.02em; }
     .page-header p  { margin: 0.25rem 0 0; font-size: 0.95rem; color: #6b7280; }
 
-    /* Glass Cards */
     .glass-card {
         background: var(--glass-bg);
         backdrop-filter: blur(12px);
@@ -32,7 +71,6 @@
         transition: transform 0.2s ease;
     }
 
-    /* KPI Row */
     .kpi-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -56,7 +94,6 @@
     .kpi-card .value { font-size: 2.2rem; font-weight: 900; margin: 0.5rem 0; font-family: 'Inter', sans-serif; }
     .kpi-card .trend { font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 4px; }
 
-    /* Filters */
     .filter-section {
         padding: 1.25rem;
         display: flex;
@@ -80,7 +117,6 @@
     }
     .filter-section select:focus { border-color: var(--accent-green); }
 
-    /* Table Styling */
     .table-container { width: 100%; overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; }
     th { 
@@ -101,7 +137,6 @@
     .empty-state i { font-size: 3rem; color: #d1d5db; margin-bottom: 1rem; display: block; }
     .empty-state p { color: #9ca3af; font-size: 1rem; }
 
-    /* Badges y estilos adicionales */
     .badge {
         padding: 4px 12px;
         border-radius: 20px;
@@ -113,7 +148,6 @@
         gap: 5px;
     }
 
-    /* Paginación */
     .pagination {
         display: flex;
         justify-content: center;
@@ -146,79 +180,234 @@
         cursor: not-allowed;
     }
 
-    /* Modal Simple */
-    .modal-overlay {
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000;
+    /* ===== MODAL ESTILO ACADÉMICO ===== */
+    .eval-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.65);
+        backdrop-filter: blur(6px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        padding: 1rem;
     }
-    .modal-content {
-        background: #fff; padding: 2rem; border-radius: 20px; width: 90%; max-width: 500px;
-        box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+    .eval-overlay.active { display: flex; }
+
+    .eval-box {
+        background: #fff;
+        border-radius: 24px;
+        width: 100%;
+        max-width: 520px;
+        padding: 2rem;
+        box-shadow: 0 25px 60px rgba(0,0,0,0.25);
+        animation: evalPop 0.25s ease-out;
     }
-    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
-    .modal-header h2 { margin: 0; font-size: 1.25rem; font-weight: 800; color: #1a472a; }
+    @keyframes evalPop {
+        from { transform: scale(0.92); opacity: 0; }
+        to   { transform: scale(1);    opacity: 1; }
+    }
+
+    .eval-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid #f1f5f9;
+    }
+    .eval-header h3 {
+        font-weight: 800;
+        font-size: 1.15rem;
+        color: #0f172a;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .eval-close {
+        background: #f1f5f9;
+        border: none;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        font-weight: 900;
+        color: #64748b;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .eval-close:hover { background: #e2e8f0; color: #0f172a; }
+
+    @keyframes pulse-ring {
+        0% { transform: scale(0.33); }
+        80%, 100% { opacity: 0; }
+    }
+    .live-dot {
+        width: 8px; height: 8px; border-radius: 50%; background: #22c55e;
+        position: relative; display: inline-block;
+    }
+    .live-dot::after {
+        content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+        border-radius: 50%; background: inherit; animation: pulse-ring 1.5s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
+    }
 </style>
 
-<div class="page-header">
-    <div>
-        <h1>⏱️ Tiempo de Detección</h1>
-        <p>Análisis del tiempo promedio de respuesta en detección de eventos</p>
-    </div>
-    <div style="display:flex; gap: 0.75rem;">
-        @if($location_id == 3)
-        <button onclick="openManualModal()" class="btn btn-success shadow-sm" style="border-radius:10px; font-weight:600; font-size:0.85rem; background: var(--accent-green); color: white; border: none; padding: 0 1rem; display: flex; align-items: center; gap: 6px; cursor: pointer;">
-            <i class="fas fa-plus"></i> Ingresar Datos Manuales
-        </button>
-        @endif
-        <a href="{{ route('detection_time.export', ['location_id' => $location_id, 'filter' => $filter]) }}" class="btn btn-light shadow-sm" style="border-radius:10px; font-weight:600; font-size:0.85rem; text-decoration: none; display: flex; align-items: center; justify-content: center; padding: 0.5rem 1rem;">
-            <i class="fas fa-download"></i> Descargar
-        </a>
-    </div>
-</div>
-
-@if(session('success'))
-    <div class="alert alert-success" style="background-color: #dcfce7; border: 1px solid #bbf7d0; color: #16a34a; padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 8px;">
-        <i class="fas fa-check-circle" style="font-size: 1.2rem;"></i>
-        <span style="font-weight: 600; font-size: 0.9rem;">{{ session('success') }}</span>
-    </div>
-@endif
-
-@if($errors->any())
-    <div class="alert alert-danger" style="background-color: #fee2e2; border: 1px solid #fecaca; color: #dc2626; padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem;">
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 0.5rem; font-weight: 700; font-size: 0.9rem;">
-            <i class="fas fa-exclamation-circle" style="font-size: 1.2rem;"></i>
-            <span>Por favor corrige los siguientes errores:</span>
+<div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+    {{-- Header Section --}}
+    <div class="page-header">
+        <div>
+            <h1>Tiempo de Detección</h1>
+            <p>Indicador del tiempo promedio de detección de eventos de Lixiviación</p>
         </div>
-        <ul style="margin: 0; padding-left: 1.5rem; font-size: 0.85rem; font-weight: 600;">
-            @foreach($errors->all() as $error)
-                <li>{{ $error }}</li>
-            @endforeach
-        </ul>
-    </div>
-@endif
-
-<div class="kpi-grid">
-    <div class="glass-card kpi-card" style="border-left: 5px solid var(--accent-blue);">
-        <div class="icon-box"><i class="fas fa-chart-bar"></i></div>
-        <div class="label">Total de Alertas</div>
-        <div class="value" style="color: var(--accent-blue);">{{ $total_alerts }}</div>
-        <div class="trend" style="color: var(--accent-blue);">Registradas</div>
-    </div>
-    <div class="glass-card kpi-card" style="border-left: 5px solid var(--accent-green);">
-        <div class="icon-box"><i class="fas fa-calendar-days"></i></div>
-        <div class="label">Días Analizados</div>
-        <div class="value" style="color: var(--accent-green);">{{ $unique_days }}</div>
-        <div class="trend" style="color: var(--accent-green);">Período</div>
-    </div>
-    <div class="glass-card kpi-card" style="border-left: 5px solid var(--accent-purple);">
-        <div class="icon-box"><i class="fas fa-hourglass-end"></i></div>
-        <div class="label">Promedio Gral.</div>
-        <div class="value" style="color: var(--accent-purple); font-family: monospace;">
-            {{ $unique_days > 0 && $total_alerts > 0 ? round(collect($detectionRecords->items())->avg('tiempo_promedio'), 2) : '--' }}s
+        <div style="display:flex; gap: 0.75rem;">
+            <a href="{{ route('detection_time.export', ['location_id' => $location_id, 'filter' => $filter]) }}" class="btn btn-light shadow-sm" style="border-radius:10px; font-weight:600; font-size:0.85rem; text-decoration: none; display: flex; align-items: center; justify-content: center; padding: 0.5rem 1rem;">
+                <i class="fas fa-download"></i> Descargar
+            </a>
         </div>
-        <div class="trend" style="color: var(--accent-purple);">segundos</div>
     </div>
-</div>
+
+    @if(session('success'))
+        <div style="background-color: #dcfce7; border: 1px solid #bbf7d0; color: #16a34a; padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 8px;">
+            <i class="fas fa-check-circle" style="font-size: 1.2rem;"></i>
+            <span style="font-weight: 600; font-size: 0.9rem;">{{ session('success') }}</span>
+        </div>
+    @endif
+
+    @if(session('error'))
+        <div style="background-color: #fee2e2; border: 1px solid #fecaca; color: #dc2626; padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem;">
+            <span style="font-weight: 600;">{{ session('error') }}</span>
+        </div>
+    @endif
+
+    {{-- ═══════════════════════════════════════════════════════════════ --}}
+    {{-- 🎯 SELECTOR DE MODO (IoT / Manual)                            --}}
+    {{-- ═══════════════════════════════════════════════════════════════ --}}
+    <div class="mb-6">
+        <label class="block text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest">📡 Modo de Visualización</label>
+        <div class="flex gap-3">
+            @php
+                $defaultIotLoc = $lotesGE->first()?->locations->first()?->id;
+                $defaultManualLoc = $lotesGC->first()?->locations->first()?->id;
+            @endphp
+            
+            <a href="{{ route('detection_time', ['mode' => 'iot', 'location_id' => ($location_id && !$isCtrl) ? $location_id : $defaultIotLoc, 'filter' => $filter]) }}" 
+               class="flex-1 max-w-xs px-6 py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-3 {{ $mode === 'iot' ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-200' : 'bg-white text-slate-600 border-2 border-slate-200 hover:border-emerald-300' }}">
+                <i class="fas fa-robot text-xl"></i>
+                <div class="text-left">
+                    <div class="text-xs uppercase tracking-wider">Sensores IoT</div>
+                    <div class="text-[10px] font-medium opacity-80">Datos automáticos</div>
+                </div>
+            </a>
+            
+            <a href="{{ route('detection_time', ['mode' => 'manual', 'location_id' => ($location_id && $isCtrl) ? $location_id : $defaultManualLoc, 'filter' => $filter]) }}" 
+               class="flex-1 max-w-xs px-6 py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-3 {{ $mode === 'manual' ? 'bg-amber-600 text-white shadow-xl shadow-amber-200' : 'bg-white text-slate-600 border-2 border-slate-200 hover:border-amber-300' }}">
+                <i class="fas fa-user-edit text-xl"></i>
+                <div class="text-left">
+                    <div class="text-xs uppercase tracking-wider">Registro Manual</div>
+                    <div class="text-[10px] font-medium opacity-80">Datos de campo</div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    {{-- ═══════════════════════════════════════════════════════════════ --}}
+    {{-- 🌳 SELECTOR DE PLANTA (FILTRA SEGÚN MODO)                     --}}
+    {{-- ═══════════════════════════════════════════════════════════════ --}}
+    <div class="flex flex-col lg:flex-row gap-6 mb-10 items-end">
+        <div class="flex-grow max-w-xl">
+            <form method="GET" action="{{ route('detection_time') }}" id="location-form">
+                <input type="hidden" name="filter" value="{{ $filter }}">
+                <input type="hidden" name="mode" value="{{ $mode }}">
+                <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">
+                    🌳 Seleccionar Planta de Palto — {{ $mode === 'iot' ? 'Grupo Experimental' : 'Grupo Control' }}
+                </label>
+                <select name="location_id" id="location-selector" onchange="this.form.submit()" 
+                        class="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-{{ $mode === 'iot' ? 'emerald' : 'amber' }}-500 transition-all shadow-sm">
+                    
+                    @if($mode === 'iot')
+                        <optgroup label="🔵 GRUPO EXPERIMENTAL (IoT)">
+                            @foreach($lotesGE as $lote)
+                                @php $loc = $lote->locations->first(); @endphp
+                                @if($loc)
+                                    <option value="{{ $loc->id }}" {{ $location_id == $loc->id ? 'selected' : '' }}>
+                                        🌳 {{ $lote->name }} (Planta {{ $lote->plant_number }})
+                                    </option>
+                                @endif
+                            @endforeach
+                        </optgroup>
+                    @else
+                        <optgroup label="🟢 GRUPO CONTROL (Manual)">
+                            @foreach($lotesGC as $lote)
+                                @php $loc = $lote->locations->first(); @endphp
+                                @if($loc)
+                                    <option value="{{ $loc->id }}" {{ $location_id == $loc->id ? 'selected' : '' }}>
+                                        🌳 {{ $lote->name }} (Planta {{ $lote->plant_number }})
+                                    </option>
+                                @endif
+                            @endforeach
+                        </optgroup>
+                    @endif
+                </select>
+            </form>
+        </div>
+    </div>
+
+    {{-- ═══════════════════════════════════════════════════════════════ --}}
+    {{-- 🎯 PANEL SUPERIOR: MODO MANUAL O IoT                          --}}
+    {{-- ═══════════════════════════════════════════════════════════════ --}}
+    @if(isset($selectedLocation))
+        <div class="mb-8 p-8 rounded-3xl border {{ $mode === 'manual' ? 'border-amber-200/70 bg-gradient-to-br from-amber-50 to-white shadow-md shadow-amber-100/40' : 'border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white shadow-md shadow-emerald-100/40' }}">
+            <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center gap-3">
+                    <span class="p-3 {{ $mode === 'manual' ? 'bg-amber-500' : 'bg-emerald-500' }} text-white rounded-2xl shadow-lg">
+                        <i class="fas {{ $mode === 'manual' ? 'fa-user-edit' : 'fa-robot' }}"></i>
+                    </span>
+                    <div>
+                        <h3 class="text-xl font-black {{ $mode === 'manual' ? 'text-amber-800' : 'text-emerald-800' }}">
+                            {{ $mode === 'manual' ? '📝 Modo Manual — ' : '📡 Modo IoT — ' }}{{ $selectedLocation->lote->name ?? 'N/D' }}
+                        </h3>
+                        <p class="text-sm font-medium {{ $mode === 'manual' ? 'text-amber-600' : 'text-emerald-600' }}">
+                            {{ $mode === 'manual' ? 'Registre manualmente los tiempos de detección de eventos' : 'Tiempos calculados automáticamente desde las alertas del sistema.' }}
+                        </p>
+                    </div>
+                </div>
+                
+                @if($mode === 'manual')
+                    <button type="button" onclick="openManualModal()" class="px-5 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl font-black text-sm shadow-xl shadow-amber-200 transform hover:-translate-y-1 transition-all flex items-center gap-2">
+                        <i class="fas fa-plus"></i> NUEVO REGISTRO MANUAL
+                    </button>
+                @else
+                    <div class="px-4 py-2 bg-white rounded-xl border border-emerald-100 flex items-center gap-2">
+                        <div class="live-dot"></div>
+                        <span class="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Cálculo Automático</span>
+                    </div>
+                @endif
+            </div>
+        </div>
+    @endif
+
+    {{-- KPIs --}}
+    <div class="kpi-grid">
+        <div class="glass-card kpi-card" style="border-left: 5px solid var(--accent-blue);">
+            <div class="icon-box"><i class="fas fa-chart-bar"></i></div>
+            <div class="label">Total de Alertas</div>
+            <div class="value" style="color: var(--accent-blue);">{{ $total_alerts }}</div>
+            <div class="trend" style="color: var(--accent-blue);">Registradas</div>
+        </div>
+        <div class="glass-card kpi-card" style="border-left: 5px solid var(--accent-green);">
+            <div class="icon-box"><i class="fas fa-calendar-days"></i></div>
+            <div class="label">Días Analizados</div>
+            <div class="value" style="color: var(--accent-green);">{{ $unique_days }}</div>
+            <div class="trend" style="color: var(--accent-green);">Período</div>
+        </div>
+        <div class="glass-card kpi-card" style="border-left: 5px solid var(--accent-purple);">
+            <div class="icon-box"><i class="fas fa-hourglass-end"></i></div>
+            <div class="label">Promedio Gral.</div>
+            <div class="value" style="color: var(--accent-purple); font-family: monospace;">
+                {{ $unique_days > 0 && $total_alerts > 0 ? round(collect($detectionRecords->items())->avg('tiempo_promedio_segundos'), 2) : '--' }}s
+            </div>
+            <div class="trend" style="color: var(--accent-purple);">segundos</div>
+        </div>
+    </div>
 
     {{-- Charts Block --}}
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -236,235 +425,199 @@
         </div>
     </div>
 
-<div class="glass-card mb-12">
-    <div class="filter-section rounded-t-2xl">
-        <div class="filter-group">
-            <label>Ubicación</label>
-                <select id="f-location" onchange="changeFilter('location')">
-                    @foreach($locations as $loc)
-
-                        @if(in_array($loc->id, [3, 4]))
-
-                            @php
-                                $label = match (true) {
-                                    $loc->id == 3 => 'Planta de Palto - GC',
-                                    $loc->id == 4 => 'Planta de Palto - GE',
-                                    $loc->experimental_group === 'control' => 'Planta de Palto - GC',
-                                    $loc->experimental_group === 'experimental' => 'Planta de Palto - GE',
-                                    default => ($loc->lote->name ?? 'Sin Lote') . ' — ' . ($loc->name ?? ''),
-                                };
-                            @endphp
-
-                            <option value="{{ $loc->id }}" {{ $location_id == $loc->id ? 'selected' : '' }}>
-                                {{ $label }}
-                            </option>
-
-                        @endif
-
-                    @endforeach
-                </select>
+    {{-- Tabla de Registros --}}
+    <div class="glass-card mb-12">
+        <div class="filter-section rounded-t-2xl">
+            <div class="filter-group">
+                <label>Planta Actual</label>
+                <div class="px-4 py-2 bg-slate-50 rounded-xl font-bold text-slate-700">
+                    🌳 {{ $selectedLocation->lote->name ?? 'N/D' }}
+                </div>
+            </div>
+            <div class="filter-group">
+                <label>Período</label>
+                <div class="flex items-center">
+                    <div class="inline-flex bg-white/80 backdrop-blur-md p-1 rounded-2xl shadow-sm ring-1 ring-slate-200">
+                        @foreach(['24h', '7d', '14d', '30d', 'all'] as $f)
+                            <a href="{{ route('detection_time', ['location_id' => $location_id, 'mode' => $mode, 'filter' => $f]) }}"
+                               class="filter-btn {{ $filter === $f ? 'active' : '' }}">
+                                {{ strtoupper($f) }}
+                            </a>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+            <div style="margin-left:auto; display:flex; align-items:center; gap:10px;">
+                <span class="px-3 py-1 bg-slate-100 rounded-full text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                    {{ count($detectionRecords->items()) }} Registros
+                </span>
+            </div>
         </div>
-        <div class="filter-group">
-            <label>Período</label>
-            <select id="f-filter" onchange="changeFilter('filter')">
-                <option value="24h" {{ $filter === '24h' ? 'selected' : '' }}>Últimas 24 horas</option>
-                <option value="7d" {{ $filter === '7d' ? 'selected' : '' }}>Últimos 7 días</option>
-                <option value="14d" {{ $filter === '14d' ? 'selected' : '' }}>Últimos 14 días</option>
-                <option value="30d" {{ $filter === '30d' ? 'selected' : '' }}>Últimos 30 días</option>
-                <option value="all" {{ $filter === 'all' ? 'selected' : '' }}>Todos los registros</option>
-            </select>
-        </div>
-        <div style="margin-left:auto; display:flex; align-items:center; gap:10px;">
-            <span class="px-3 py-1 bg-slate-100 rounded-full text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                {{ count($detectionRecords->items()) }} Días
-            </span>
-        </div>
-    </div>
 
-    <div class="table-container">
-        <table class="w-full">
-            <thead>
-                <tr>
-                    <th class="px-6 py-4">Día</th>
-                    <th class="px-6 py-4">Fecha</th>
-                    <th class="px-6 py-4">Tiempo Inicial (Ti)</th>
-                    <th class="px-6 py-4">Tiempo Final (Tf)</th>
-                    <th class="px-6 py-4">Planta de Palto</th>
-                    <th class="px-6 py-4">Tiempo Promedio</th>
-                    <th class="px-6 py-4 text-center font-medium">Eventos</th>
-                </tr>
-            </thead>
-            <tbody id="detection-body">
-                @if(count($detectionRecords->items()) > 0)
-                    @foreach($detectionRecords->items() as $index => $day)
+        <div class="table-container">
+            <table class="w-full">
+                <thead>
+                    <tr>
+                        <th class="px-6 py-4">#</th>
+                        <th class="px-6 py-4">Fecha</th>
+                        <th class="px-6 py-4">Tiempo Promedio</th>
+                        <th class="px-6 py-4">Eventos</th>
+                        <th class="px-6 py-4">Tipo Entrada</th>
+                    </tr>
+                </thead>
+                <tbody id="detection-body">
+                    @if(count($detectionRecords->items()) > 0)
+                        @foreach($detectionRecords->items() as $index => $day)
+                            <tr>
+                                <td>
+                                    <div style="font-weight: 700; color: #374151;">
+                                        {{ $detectionRecords->firstItem() + $index }}
+                                    </div>
+                                </td>
+                                <td>
+                                    <div style="font-weight: 700; color: #1a472a;">
+                                        {{ \Carbon\Carbon::parse($day->fecha)->format('d/m/Y') }}
+                                    </div>
+                                </td>
+                                <td>
+                                    <div style="font-family: monospace; font-weight: 800; color: #16a34a; font-size: 0.95rem;">
+                                        {{ number_format($day->tiempo_promedio_segundos, 2) }}s
+                                    </div>
+                                    <div style="font-size: 0.7rem; color: #9ca3af;">
+                                        (~{{ round($day->tiempo_promedio_segundos / 60, 2) }} min)
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="px-6 py-4 text-center font-medium">
+                                        <span class="badge bg-blue-100 text-blue-700">
+                                            {{ $day->cantidad_eventos }} eventos
+                                        </span>
+                                    </div>
+                                </td>
+                                <td>
+                                    @if($day->tipo_entrada === 'manual')
+                                        <span class="badge bg-amber-100 text-amber-700">
+                                            <i class="fas fa-user-edit"></i> Manual
+                                        </span>
+                                    @else
+                                        <span class="badge bg-slate-100 text-slate-600">
+                                            <i class="fas fa-robot"></i> Automático
+                                        </span>
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    @else
                         <tr>
-                            <td>
-                                <div style="font-weight: 700; color: #374151;">
-                                    {{ $detectionRecords->total() - ($detectionRecords->firstItem() + $index) + 1 }}
-                                </div>
-                            </td>
-                            <td>
-                                <div style="font-weight: 700; color: #1a472a;">{{ \Carbon\Carbon::parse($day['fecha'])->format('d/m/Y') }}</div>
-                            </td>
-                            <td>
-                                <div style="font-size: 0.85rem; color: #6b7280;">{{ \Carbon\Carbon::parse($day['tiempo_inicial'])->format('H:i:s') }}</div>
-                            </td>
-                            <td>
-                                <div style="font-size: 0.85rem; color: #6b7280;">{{ \Carbon\Carbon::parse($day['tiempo_final'])->format('H:i:s') }}</div>
-                            </td>
-                            <td>
-                                <div style="font-weight: 600; color: #9333ea;">{{ $day['subparcela'] }}</div>
-                            </td>
-                            <td>
-                                <div style="font-family: monospace; font-weight: 800; color: #16a34a; font-size: 0.95rem;">
-                                    {{ number_format($day['tiempo_promedio'], 2) }}s
-                                </div>
-                                <div style="font-size: 0.7rem; color: #9ca3af;">
-                                    (~{{ round($day['tiempo_promedio'] / 60, 2) }} min)
-                                </div>
-                            </td>
-                            <td>
-                                <div class="px-6 py-4 text-center font-medium">{{ $day['cantidad_eventos'] }}</div>
-                            </td>
-                            <td class="px-6 py-4 text-center" style="display: none;">
-                                @if(isset($day['tipo_entrada']) && $day['tipo_entrada'] === 'manual')
-                                    @php $recId = isset($day['id']) ? $day['id'] : $day['numero']; @endphp
-                                    <button class="text-blue-500 hover:text-blue-700" title="Modificar"><i class="fas fa-edit"></i></button>
-                                @else
-                                    <span class="text-gray-400" title="Registro automático no modificable">-</span>
-                                @endif
+                            <td colspan="5" class="empty-state">
+                                <i class="fas fa-inbox"></i>
+                                <p>No se encontraron registros de tiempo de detección con los filtros seleccionados.</p>
                             </td>
                         </tr>
-                    @endforeach
-                @else
-                    <tr>
-                        <td colspan="8" class="empty-state">
-                            <i class="fas fa-inbox"></i>
-                            <p>No se encontraron registros de tiempo de detección con los filtros seleccionados.</p>
-                        </td>
-                    </tr>
-                @endif
-            </tbody>
-        </table>
-    </div>
-
-    @if($detectionRecords->hasPages())
-        <div class="pagination">
-            {{-- Botón anterior --}}
-            @if($detectionRecords->onFirstPage())
-                <span class="disabled"><i class="fas fa-chevron-left"></i> Anterior</span>
-            @else
-                <a href="{{ $detectionRecords->previousPageUrl() }}"><i class="fas fa-chevron-left"></i> Anterior</a>
-            @endif
-
-            {{-- Links de página --}}
-            @foreach($detectionRecords->getUrlRange(1, $detectionRecords->lastPage()) as $page => $url)
-                @if($page == $detectionRecords->currentPage())
-                    <span class="active">{{ $page }}</span>
-                @else
-                    <a href="{{ $url }}">{{ $page }}</a>
-                @endif
-            @endforeach
-
-            {{-- Botón siguiente --}}
-            @if($detectionRecords->hasMorePages())
-                <a href="{{ $detectionRecords->nextPageUrl() }}">Siguiente <i class="fas fa-chevron-right"></i></a>
-            @else
-                <span class="disabled">Siguiente <i class="fas fa-chevron-right"></i></span>
-            @endif
+                    @endif
+                </tbody>
+            </table>
         </div>
-    @endif
+
+        @if($detectionRecords->hasPages())
+            <div class="pagination">
+                @if($detectionRecords->onFirstPage())
+                    <span class="disabled"><i class="fas fa-chevron-left"></i> Anterior</span>
+                @else
+                    <a href="{{ $detectionRecords->previousPageUrl() }}"><i class="fas fa-chevron-left"></i> Anterior</a>
+                @endif
+
+                @foreach($detectionRecords->getUrlRange(1, $detectionRecords->lastPage()) as $page => $url)
+                    @if($page == $detectionRecords->currentPage())
+                        <span class="active">{{ $page }}</span>
+                    @else
+                        <a href="{{ $url }}">{{ $page }}</a>
+                    @endif
+                @endforeach
+
+                @if($detectionRecords->hasMorePages())
+                    <a href="{{ $detectionRecords->nextPageUrl() }}">Siguiente <i class="fas fa-chevron-right"></i></a>
+                @else
+                    <span class="disabled">Siguiente <i class="fas fa-chevron-right"></i></span>
+                @endif
+            </div>
+        @endif
+    </div>
 </div>
 
-<!-- Modal de Registro Manual -->
-<div id="modalManual" class="modal-overlay">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2>⏱️ Registrar TPD Manual</h2>
-            <button onclick="closeManualModal()" class="btn btn-link text-muted" style="padding:0; border: none; background: transparent; cursor: pointer; font-size: 1.25rem;"><i class="fas fa-times"></i></button>
+{{-- ═══════════════════════════════════════════════════════════════════ --}}
+{{-- 🆕 MODAL: REGISTRO MANUAL                                         --}}
+{{-- ═══════════════════════════════════════════════════════════════════ --}}
+<div id="manualModal" class="eval-overlay">
+    <div class="eval-box">
+        <div class="eval-header">
+            <h3>⏱️ Nuevo Registro Manual — Tiempo de Detección</h3>
+            <button type="button" class="eval-close" onclick="closeManualModal()">✕</button>
         </div>
-        <form action="{{ route('detection_time.store_manual') }}" method="POST" id="manual-form">
-            @csrf
-            <div style="margin-bottom: 1.25rem;">
-                <label style="font-size: 0.75rem; font-weight: 700; color: #9ca3af; text-transform: uppercase; margin-bottom: 0.5rem; display: block;">Subparcela (Control)</label>
-                <select name="location_id" class="w-full" required style="width: 100%; padding: 0.6rem 0.8rem; border: 1px solid #e5e7eb; border-radius: 10px; font-size: 0.85rem; background: #fff; outline: none;">
-                    <option value="">Seleccione una subparcela de control...</option>
-                    @foreach($locations as $loc)
-                        @if($loc->experimental_group === 'control' && in_array($loc->id, [3, 4]))
-                        @php
-                            $label = match ($loc->id) {
-                                3 => 'Planta de Palto - GC (Control)',
-                                4 => 'Planta de Palto - GE (Experimental)',
-                                default => ($loc->lote->name ?? 'Sin Lote') . ' — ' . ($loc->name ?? ''),
-                            };
-                        @endphp
 
-                        <option value="{{ $loc->id }}" {{ $location_id == $loc->id ? 'selected' : '' }}>
-                            {{ $label }}
-                        </option>
+        <p class="text-sm text-slate-600 mb-4 font-semibold">
+            Registre manualmente los tiempos de detección para la planta seleccionada.
+        </p>
+
+        <form action="{{ route('detection_time.store_manual') }}" method="POST">
+            @csrf
+            
+            {{-- 🌳 SELECTOR DE PLANTA GC --}}
+            <div class="mb-4">
+                <label class="text-xs font-black text-slate-500 uppercase tracking-wider">🌳 Planta de palto (Grupo Control)</label>
+                <select name="location_id" class="w-full p-3 border border-slate-200 rounded-xl mt-1 focus:ring-2 focus:ring-amber-500 focus:border-transparent" required>
+                    <option value="">Seleccione planta</option>
+                    @foreach($lotesGC as $lote)
+                        @php $loc = $lote->locations->first(); @endphp
+                        @if($loc)
+                            <option value="{{ $loc->id }}" {{ ($selectedLocation && $selectedLocation->id == $loc->id) ? 'selected' : '' }}>
+                                🌳 {{ $lote->name }} (Planta {{ $lote->plant_number }})
+                            </option>
                         @endif
                     @endforeach
                 </select>
             </div>
-            <div style="margin-bottom: 1.25rem;">
-                <label style="font-size: 0.75rem; font-weight: 700; color: #9ca3af; text-transform: uppercase; margin-bottom: 0.5rem; display: block;">Subparcela (ej: S1, S2, S3...)</label>
-                <input type="text" name="subparcela" value="{{ old('subparcela') }}" required placeholder="ej: S1" pattern="[Ss]\d+" title="Debe usar la letra 'S' seguida de un número (ej. S1, S2)" style="width: 100%; padding: 0.6rem 0.8rem; border: 1px solid #e5e7eb; border-radius: 10px; font-size: 0.85rem; background: #fff; outline: none;">
-                @error('subparcela') <div class="error">{{ $message }}</div> @enderror
-            </div>
-            <div style="margin-bottom: 1.25rem;">
-                <label style="font-size: 0.75rem; font-weight: 700; color: #9ca3af; text-transform: uppercase; margin-bottom: 0.5rem; display: block;">Fecha del Evento</label>
-                <input type="date" name="fecha" required style="width: 100%; padding: 0.6rem 0.8rem; border: 1px solid #e5e7eb; border-radius: 10px; font-size: 0.85rem; background: #fff; outline: none;" value="{{ date('Y-m-d') }}">
-            </div>
-            <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
-                <div style="flex: 1;">
-                    <label style="font-size: 0.75rem; font-weight: 700; color: #9ca3af; text-transform: uppercase; margin-bottom: 0.5rem; display: block;">Hora de Alerta (Ti)</label>
-                    <input type="time" step="1" name="hora_alerta" required style="width: 100%; padding: 0.6rem 0.8rem; border: 1px solid #e5e7eb; border-radius: 10px; font-size: 0.85rem; background: #fff; outline: none;">
-                </div>
-                <div style="flex: 1;">
-                    <label style="font-size: 0.75rem; font-weight: 700; color: #9ca3af; text-transform: uppercase; margin-bottom: 0.5rem; display: block;">Hora de Evento (Tf)</label>
-                    <input type="time" step="1" name="hora_evento" required style="width: 100%; padding: 0.6rem 0.8rem; border: 1px solid #e5e7eb; border-radius: 10px; font-size: 0.85rem; background: #fff; outline: none;">
-                </div>
-            </div>
-            <div style="margin-top: 2rem; display: flex; gap: 10px;">
-                <button type="submit" class="btn btn-success" style="flex: 1; border-radius: 12px; font-weight: 700; padding: 0.75rem; background: var(--accent-green); color: white; border: none; cursor: pointer;">Guardar Registro</button>
-                <button type="button" onclick="closeManualModal()" class="btn btn-light" style="flex: 1; border-radius: 12px; font-weight: 700; padding: 0.75rem; cursor: pointer; border: 1px solid #e5e7eb; background: #fff; color: #374151;">Cancelar</button>
-            </div>
-        </form>
-    </div>
-</div>
 
-<!-- Modal de Edición Manual -->
-<div id="modalEdit" class="modal-overlay">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2>✏️ Modificar TPD Manual</h2>
-            <button onclick="closeEditModal()" class="btn btn-link text-muted" style="padding:0; border: none; background: transparent; cursor: pointer; font-size: 1.25rem;"><i class="fas fa-times"></i></button>
-        </div>
-        <form action="#" method="POST" id="edit-form">
-            @csrf
-            @method('PUT')
-            <input type="hidden" name="record_id" id="edit-record-id">
-            <div style="margin-bottom: 1.25rem;">
-                <label style="font-size: 0.75rem; font-weight: 700; color: #9ca3af; text-transform: uppercase; margin-bottom: 0.5rem; display: block;">Subparcela</label>
-                <input type="text" name="subparcela" id="edit-subparcela" required pattern="[Ss]\d+" style="width: 100%; padding: 0.6rem 0.8rem; border: 1px solid #e5e7eb; border-radius: 10px; font-size: 0.85rem; background: #fff; outline: none;">
-            </div>
-            <div style="margin-bottom: 1.25rem;">
-                <label style="font-size: 0.75rem; font-weight: 700; color: #9ca3af; text-transform: uppercase; margin-bottom: 0.5rem; display: block;">Fecha del Evento</label>
-                <input type="date" name="fecha" id="edit-fecha" required style="width: 100%; padding: 0.6rem 0.8rem; border: 1px solid #e5e7eb; border-radius: 10px; font-size: 0.85rem; background: #fff; outline: none;">
-            </div>
-            <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
-                <div style="flex: 1;">
-                    <label style="font-size: 0.75rem; font-weight: 700; color: #9ca3af; text-transform: uppercase; margin-bottom: 0.5rem; display: block;">Hora de Alerta (Ti)</label>
-                    <input type="time" step="1" name="hora_alerta" id="edit-ti" required style="width: 100%; padding: 0.6rem 0.8rem; border: 1px solid #e5e7eb; border-radius: 10px; font-size: 0.85rem; background: #fff; outline: none;">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="text-xs font-black text-slate-500 uppercase tracking-wider">📅 Fecha del Evento</label>
+                    <input type="date" name="fecha" value="{{ date('Y-m-d') }}" class="w-full p-3 border border-slate-200 rounded-xl mt-1 focus:ring-2 focus:ring-amber-500 focus:border-transparent" required />
                 </div>
-                <div style="flex: 1;">
-                    <label style="font-size: 0.75rem; font-weight: 700; color: #9ca3af; text-transform: uppercase; margin-bottom: 0.5rem; display: block;">Hora de Evento (Tf)</label>
-                    <input type="time" step="1" name="hora_evento" id="edit-tf" required style="width: 100%; padding: 0.6rem 0.8rem; border: 1px solid #e5e7eb; border-radius: 10px; font-size: 0.85rem; background: #fff; outline: none;">
+
+                <div>
+                    <label class="text-xs font-black text-slate-500 uppercase tracking-wider">🏷️ Subparcela (ej: S1, S2)</label>
+                    <input type="text" name="subparcela" value="{{ old('subparcela') }}" required placeholder="ej: S1" pattern="[Ss]\d+" title="Debe usar la letra 'S' seguida de un número"
+                           class="w-full p-3 border border-slate-200 rounded-xl mt-1 focus:ring-2 focus:ring-amber-500 focus:border-transparent" />
+                </div>
+
+                <div>
+                    <label class="text-xs font-black text-amber-600 uppercase tracking-wider">⏰ Hora de Alerta (Ti)</label>
+                    <input type="time" step="1" name="hora_alerta" id="modal-ti" oninput="updateModalTAR()"
+                           class="w-full p-3 border border-amber-100 rounded-xl mt-1 focus:ring-2 focus:ring-amber-500 focus:border-transparent" required />
+                </div>
+
+                <div>
+                    <label class="text-xs font-black text-amber-600 uppercase tracking-wider">⏰ Hora de Evento (Tf)</label>
+                    <input type="time" step="1" name="hora_evento" id="modal-tf" oninput="updateModalTAR()"
+                           class="w-full p-3 border border-amber-100 rounded-xl mt-1 focus:ring-2 focus:ring-amber-500 focus:border-transparent" required />
                 </div>
             </div>
-            <div style="margin-top: 2rem; display: flex; gap: 10px;">
-                <button type="submit" class="btn btn-primary" style="flex: 1; border-radius: 12px; font-weight: 700; padding: 0.75rem; background: var(--accent-blue); color: white; border: none; cursor: pointer;">Actualizar Registro</button>
-                <button type="button" onclick="closeEditModal()" class="btn btn-light" style="flex: 1; border-radius: 12px; font-weight: 700; padding: 0.75rem; cursor: pointer; border: 1px solid #e5e7eb; background: #fff; color: #374151;">Cancelar</button>
+
+            {{-- Preview TAR en tiempo real --}}
+            <div class="mt-4 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl">
+                <div class="text-[10px] font-black uppercase text-purple-600 tracking-widest mb-1">Vista previa del cálculo</div>
+                <div class="flex items-baseline gap-2">
+                    <span class="text-xs font-bold text-slate-600">Tiempo de Detección =</span>
+                    <span class="text-2xl font-black text-purple-700 font-mono" id="modal-tar-preview">--</span>
+                    <span class="status-badge bg-purple-50 text-purple-600 ml-2" id="modal-tar-unit">segundos</span>
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-end gap-3">
+                <button type="button" onclick="closeManualModal()" class="px-4 py-2 rounded-xl border border-slate-200 font-bold text-slate-600 hover:bg-slate-50">Cancelar</button>
+                <button type="submit" class="px-6 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-black shadow-sm flex items-center gap-2">
+                    <i class="fas fa-save"></i> Guardar Registro
+                </button>
             </div>
         </form>
     </div>
@@ -474,51 +627,51 @@
 
 @push('scripts')
 <script>
-function changeFilter(type) {
-    const locationId = document.getElementById('f-location').value;
-    const filter = document.getElementById('f-filter').value;
-    
-    let url = '{{ route('detection_time') }}';
-    const params = new URLSearchParams();
-    
-    if (locationId) params.append('location_id', locationId);
-    params.append('filter', filter);
-    
-    window.location.href = url + (params.toString() ? '?' + params.toString() : '');
-}
-
+/* ========== MODAL DE REGISTRO MANUAL ========== */
 function openManualModal() {
-    document.getElementById('modalManual').style.display = 'flex';
+    document.getElementById('manualModal').classList.add('active');
 }
 
 function closeManualModal() {
-    document.getElementById('modalManual').style.display = 'none';
+    document.getElementById('manualModal').classList.remove('active');
 }
 
-function openEditModal(id, subparcela, fecha, ti, tf) {
-    document.getElementById('edit-record-id').value = id;
-    document.getElementById('edit-subparcela').value = subparcela;
+function updateModalTAR() {
+    const ti = document.getElementById('modal-ti').value;
+    const tf = document.getElementById('modal-tf').value;
     
-    // Parse the date (yyyy-mm-dd format expected for date input)
-    let d = new Date(fecha);
-    let dateString = d.toISOString().split('T')[0];
-    document.getElementById('edit-fecha').value = dateString;
+    if (!ti || !tf) {
+        document.getElementById('modal-tar-preview').textContent = '--';
+        return;
+    }
     
-    document.getElementById('edit-ti').value = ti;
-    document.getElementById('edit-tf').value = tf;
+    const [tiH, tiM, tiS] = ti.split(':').map(Number);
+    const [tfH, tfM, tfS] = tf.split(':').map(Number);
     
-    // Note: To make this functional backend-wise, set form action here
-    // document.getElementById('edit-form').action = '/detection-time/manual/' + id;
+    const tiSec = tiH * 3600 + tiM * 60 + tiS;
+    const tfSec = tfH * 3600 + tfM * 60 + tfS;
     
-    document.getElementById('modalEdit').style.display = 'flex';
+    const diff = Math.abs(tfSec - tiSec);
+    
+    document.getElementById('modal-tar-preview').textContent = diff;
+    
+    if (diff >= 60) {
+        document.getElementById('modal-tar-unit').textContent = `seg (~${(diff/60).toFixed(1)} min)`;
+    } else {
+        document.getElementById('modal-tar-unit').textContent = 'segundos';
+    }
 }
 
-function closeEditModal() {
-    document.getElementById('modalEdit').style.display = 'none';
-}
+// Cerrar modal al hacer click fuera
+document.querySelectorAll('.eval-overlay').forEach(overlay => {
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) overlay.classList.remove('active');
+    });
+});
 </script>
 @endpush
 
+@push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function(){
@@ -553,3 +706,4 @@ document.addEventListener('DOMContentLoaded', function(){
     });
 });
 </script>
+@endpush

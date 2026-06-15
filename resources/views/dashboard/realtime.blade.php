@@ -76,11 +76,13 @@
         <div class="flex flex-wrap items-center gap-4 md:gap-8 w-full md:w-auto">
             @if($locations->isNotEmpty())
             <div class="flex-grow md:flex-grow-0">
-                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">📍 Selector de Lote</label>
+                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">📍 Selector de Lote (GE)</label>
                 <select id="location-selector" class="w-full md:min-w-[260px] p-2.5 border-2 border-slate-200 rounded-lg text-sm font-bold text-slate-700 bg-slate-50 focus:border-emerald-500 outline-none transition-colors">
-                    <option value="">-- Seleccionar Lote --</option>
+                    <option value="">-- Seleccionar Planta GE --</option>
                     @foreach($locations as $loc)
-                        <option value="{{ $loc->id }}" {{ request()->query('location_id') == $loc->id ? 'selected' : '' }}>{{ $loc->name }}</option>
+                        <option value="{{ $loc->id }}" {{ request()->query('location_id') == $loc->id ? 'selected' : '' }}>
+                            🌳 Planta #{{ $loc->lote->plant_number ?? '?' }} — {{ $loc->device_code ?? 'Sin código' }}
+                        </option>
                     @endforeach
                 </select>
             </div>
@@ -162,7 +164,7 @@
             <div class="industrial-card" id="card-ilx" style="border:2px solid #a78bfa;">
                 <div style="display:flex; justify-content:space-between; margin-bottom:0.75rem;">
                     <div>
-                        <div style="font-size:0.8rem; font-weight:800; color:#7c3aed; text-transform:uppercase;">⚗️ NLx — Nivel de Lixiviación</div>
+                        <div style="font-size:0.8rem; font-weight:800; color:#7c3aed; text-transform:uppercase;">⚗️ NL — Nivel de Lixiviación</div>
                         <div style="font-size:0.65rem; color:#94a3b8; font-weight:600; margin-top:2px;">CE_p / CE_s · Indicador principal v3</div>
                     </div>
                     <div id="trend-ilx" style="font-weight:900; font-size:1.2rem; color:#94a3b8;">-</div>

@@ -9,20 +9,24 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-    public function up(): void
+   public function up(): void
     {
         Schema::table('locations', function (Blueprint $table) {
             $table->json('alert_settings')->nullable()->after('is_active');
         });
 
-        // Inicializar con valores por defecto para ubicaciones existentes
-        \Illuminate\Support\Facades\DB::table('locations')->update([
-            'alert_settings' => json_encode([
-                'lixiviacion_alta' => true,
-                'lixiviacion' => true,
-                'acumulacion' => true,
-            ])
-        ]);
+        // inicializar correctamente
+        $locations = \App\Models\Location::all();
+
+        foreach ($locations as $location) {
+            $location->update([
+                'alert_settings' => [
+                    'lixiviacion_alta' => true,
+                    'lixiviacion' => true,
+                    'acumulacion' => true,
+                ]
+            ]);
+        }
     }
 
     /**

@@ -4,83 +4,40 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Lote extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'user_id', 'crop_type'];
+    protected $table = 'lotes';
 
-    protected $casts = [
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
+    protected $fillable = [
+        'name',
+        'user_id',
+        'crop_type',
+        'plant_number',
+        'experimental_group',
+        'description',
+        'reference_ce'
     ];
 
-    /**
-     * Obtener el usuario propietario de este lote
-     */
-    public function user(): BelongsTo
+    public function user()
     {
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * Obtener todas las ubicaciones en este lote
-     */
-    public function locations(): HasMany
+    public function locations()
     {
         return $this->hasMany(Location::class);
     }
 
-    /**
-     * Obtener todas las lecturas de este lote (a través de sensores)
-     */
-    public function readings()
+    public function evaluations(): HasMany
     {
-        return Reading::whereIn('sensor_id', 
-            Sensor::whereIn('location_id', $this->locations()->pluck('id'))->pluck('id')
-        );
+        return $this->hasMany(AlertEvaluation::class, 'lote_id');
     }
 
-    /**
-     * Obtener todos los análisis de este lote
-     */
-    public function analysis(): HasMany
+    public function dailyConsolidations(): HasMany
     {
-        return $this->hasMany(Analysis::class);
-    }
-
-    /**
-     * Obtener todas las alertas de este lote
-     */
-    public function alerts(): HasMany
-    {
-        return $this->hasMany(Alert::class);
-    }
-
-    /**
-     * Obtener lecturas antiguas (mantener compatibilidad)
-     */
-    public function getRecentReadings($minutes = 60)
-    {
-        return $this->readings()->recent($minutes)->get();
-    }
-
-    /**
-     * Obtener análisis con lixiviación detectada
-     */
-    public function getLixiviationAnalysis()
-    {
-        return $this->analysis()->withLixiviation()->get();
-    }
-
-    /**
-     * Obtener alertas no resueltas
-     */
-    public function getUnresolvedAlerts()
-    {
-        return $this->alerts()->unresolved()->get();
+        return $this->hasMany(DailyConsolidation::class, 'lote_id');
     }
 }

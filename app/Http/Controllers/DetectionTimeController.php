@@ -17,125 +17,127 @@ class DetectionTimeController extends Controller
     {
         $location_id = $request->query('location_id');
         $filter = $request->query('filter', 'all');
-
-        // Only allow location IDs 3 and 4
-        $allowedLocations = [3, 4];
-        if (!$location_id || !in_array($location_id, $allowedLocations)) {
-            $location_id = 3;
+        $mode = $request->query('mode', 'manual'); // 🆕 'iot' o 'manual'
+        
+        // ═══════════════════════════════════════════════════════════════
+        // 🌳 CARGAR PLANTAS POR GRUPO
+        // ═══════════════════════════════════════════════════════════════
+        $lotesGC = \App\Models\Lote::where('experimental_group', 'control')
+            ->orderBy('plant_number')->get();
+        $lotesGE = \App\Models\Lote::where('experimental_group', 'experimental')
+            ->orderBy('plant_number')->get();
+        
+        $selectedLocation = $location_id ? Location::find($location_id) : null;
+        
+        // 🛡️ CORRECCIÓN DE LÓGICA INVERSA (igual que lixiviación)
+        if ($mode === 'iot' && $selectedLocation && $selectedLocation->experimental_group === 'control') {
+            $firstGE = $lotesGE->first();
+            $location_id = $firstGE && $firstGE->locations->isNotEmpty() ? $firstGE->locations->first()->id : null;
+            $selectedLocation = $location_id ? Location::find($location_id) : null;
         }
-
-        $locations = Location::with('lote')->whereIn('id', $allowedLocations)->orderBy('name')->get();
-
-        // Sincronizar todas las alertas de la base de datos en la tabla detection_time_records (procesamiento automático)
+        
+        if ($mode === 'manual' && $selectedLocation && $selectedLocation->experimental_group === 'experimental') {
+            $firstGC = $lotesGC->first();
+            $location_id = $firstGC && $firstGC->locations->isNotEmpty() ? $firstGC->locations->first()->id : null;
+            $selectedLocation = $location_id ? Location::find($location_id) : null;
+        }
+        
+        if (!$selectedLocation) {
+            if ($mode === 'iot') {
+                $firstGE = $lotesGE->first();
+                if ($firstGE && $firstGE->locations->isNotEmpty()) {
+                    $location_id = $firstGE->locations->first()->id;
+                    $selectedLocation = Location::find($location_id);
+                }
+            } else {
+                $firstGC = $lotesGC->first();
+                if ($firstGC && $firstGC->locations->isNotEmpty()) {
+                    $location_id = $firstGC->locations->first()->id;
+                    $selectedLocation = Location::find($location_id);
+                }
+            }
+        }
+        
+        $isCtrl = $selectedLocation && $selectedLocation->experimental_group === 'control';
+        
+        // Sincronizar alertas (igual que tenías)
         $allAlerts = Alert::with('location.lote')
             ->whereNotNull('tiempo_alerta')
             ->whereNotNull('tiempo_riesgo')
             ->get();
         $this->saveDetectionTimeRecords($allAlerts);
-
-        // Consultar directamente los registros de DetectionTimeRecord
+        
+        // Consultar registros
         $recordsQuery = DetectionTimeRecord::with('location.lote')
             ->where('location_id', $location_id)
             ->orderByDesc('fecha');
-
-        // Aplicar filtros de tiempo en base a la columna 'fecha'
+        
         switch ($filter) {
-            case '24h':
-                $recordsQuery->where('fecha', '>=', Carbon::today());
-                break;
-            case '7d':
-                $recordsQuery->where('fecha', '>=', Carbon::today()->subDays(7));
-                break;
-            case '14d':
-                $recordsQuery->where('fecha', '>=', Carbon::today()->subDays(14));
-                break;
-            case '30d':
-                $recordsQuery->where('fecha', '>=', Carbon::today()->subDays(30));
-                break;
-            case 'all':
-                // Sin filtro de tiempo
-                break;
+            case '24h': $recordsQuery->where('fecha', '>=', Carbon::today()); break;
+            case '7d':  $recordsQuery->where('fecha', '>=', Carbon::today()->subDays(7)); break;
+            case '14d': $recordsQuery->where('fecha', '>=', Carbon::today()->subDays(14)); break;
+            case '30d': $recordsQuery->where('fecha', '>=', Carbon::today()->subDays(30)); break;
         }
-
-        // Obtener el total de alertas sumando 'cantidad_eventos' para los registros que coinciden con el filtro
+        
         $totalAlertsCount = (clone $recordsQuery)->sum('cantidad_eventos');
-
-        // Paginar los resultados usando el paginador estándar de Eloquent
         $detectionRecords = $recordsQuery->paginate(15)->withQueryString();
-
-        // Si no hay registros en detection_time_records pero sí existen alertas en la BD,
-        // generar un fallback en memoria para garantizar que la vista no aparezca vacía.
+        
+        // Fallback en memoria
         if ($detectionRecords->total() === 0 && $allAlerts->isNotEmpty()) {
-            // Filtrar alerts en memoria según los mismos criterios (location + periodo)
             $filteredAlerts = $allAlerts;
             if ($location_id) {
                 $filteredAlerts = $filteredAlerts->where('location_id', $location_id);
             }
-
-            // Aplicar filtro temporal en base a 'tiempo_alerta'
             $since = null;
             switch ($filter) {
                 case '24h': $since = Carbon::today(); break;
                 case '7d':  $since = Carbon::today()->subDays(7); break;
                 case '14d': $since = Carbon::today()->subDays(14); break;
                 case '30d': $since = Carbon::today()->subDays(30); break;
-                case 'all':  $since = null; break;
             }
-
             if ($since) {
                 $filteredAlerts = $filteredAlerts->filter(fn($a) => $a->tiempo_alerta && $a->tiempo_alerta->greaterThanOrEqualTo($since));
             }
-
             $computed = $this->calculateDetectionTimeByDay($filteredAlerts);
-
             if (!empty($computed)) {
-                // Construir un paginador en memoria básico
                 $page = (int) request()->query('page', 1);
                 $perPage = 20;
                 $offset = ($page - 1) * $perPage;
-                $itemsForCurrentPage = array_slice($computed, $offset, $perPage);
-
                 $detectionRecords = new \Illuminate\Pagination\LengthAwarePaginator(
-                    $itemsForCurrentPage,
-                    count($computed),
-                    $perPage,
-                    $page,
+                    array_slice($computed, $offset, $perPage),
+                    count($computed), $perPage, $page,
                     ['path' => route('detection_time'), 'query' => request()->query()]
                 );
-
-                // Recalcular totalAlertsCount a partir de los datos computados
                 $totalAlertsCount = array_sum(array_column($computed, 'cantidad_eventos'));
             }
         }
-
-        $selectedLocation = $location_id ? Location::find($location_id) : null;
-
-        // Preparar series para Chart.js (consultando DetectionTimeRecord con mismos filtros)
-        $chartQuery = \App\Models\DetectionTimeRecord::query()->orderBy('fecha');
-        if ($location_id) {
-            $chartQuery->where('location_id', $location_id);
-        }
+        
+        // Gráficos
+        $chartQuery = DetectionTimeRecord::query()->orderBy('fecha');
+        if ($location_id) $chartQuery->where('location_id', $location_id);
         switch ($filter) {
             case '24h': $chartQuery->where('fecha', '>=', Carbon::today()); break;
             case '7d':  $chartQuery->where('fecha', '>=', Carbon::today()->subDays(7)); break;
             case '14d': $chartQuery->where('fecha', '>=', Carbon::today()->subDays(14)); break;
             case '30d': $chartQuery->where('fecha', '>=', Carbon::today()->subDays(30)); break;
-            case 'all': break;
         }
-
         $chartRows = $chartQuery->get();
+        
         $dates = $chartRows->map(fn($r) => $r->fecha->format('d/m/Y'))->toArray();
         $avgTimes = $chartRows->map(fn($r) => (float) $r->tiempo_promedio_segundos)->toArray();
         $events = $chartRows->map(fn($r) => (int) $r->cantidad_eventos)->toArray();
-
-        // Manual vs Automatic counts
         $manualCount = $chartRows->where('tipo_entrada', 'manual')->count();
         $automaticCount = $chartRows->where('tipo_entrada', 'automatico')->count();
-
+        
         return view('dashboard.detection_time', [
-            'locations' => $locations,
+            'lotesGC' => $lotesGC,
+            'lotesGE' => $lotesGE,
+            'locations' => Location::with('lote')->orderBy('name')->get(),
             'location_id' => $location_id,
             'location' => $selectedLocation,
+            'selectedLocation' => $selectedLocation,
+            'isCtrl' => $isCtrl,
+            'mode' => $mode,
             'detectionRecords' => $detectionRecords,
             'filter' => $filter,
             'total_alerts' => $totalAlertsCount,
@@ -465,4 +467,37 @@ class DetectionTimeController extends Controller
         return redirect()->route('detection_time', ['location_id' => $location->id])
             ->with('success', 'Registro de tiempo manual guardado correctamente.');
     }
+    // 🆕 AGREGAR ESTE MÉTODO AQUÍ (después de storeManual)
+        /**
+         * Actualiza un registro de tiempo de detección manual
+         */
+        public function updateManual(Request $request, $recordId)
+        {
+            $request->validate([
+                'subparcela'  => ['required', 'string', 'regex:/^[Ss]\d+$/'],
+                'fecha'       => 'required|date',
+                'hora_alerta' => 'required',
+                'hora_evento' => 'required',
+            ]);
+            
+            $record = DetectionTimeRecord::findOrFail($recordId);
+            
+            $fecha = $request->fecha;
+            $ti = Carbon::parse($fecha . ' ' . $request->hora_alerta);
+            $tf = Carbon::parse($fecha . ' ' . $request->hora_evento);
+            $tarSeconds = $tf->diffInSeconds($ti);
+            
+            $record->update([
+                'fecha'                    => $fecha,
+                'subparcela'               => strtoupper($request->subparcela),
+                'tiempo_promedio_segundos' => $tarSeconds,
+                'suma_tiempos_segundos'    => $tarSeconds,
+                'cantidad_eventos'         => 1,
+            ]);
+            
+            return redirect()->route('detection_time', ['location_id' => $record->location_id])
+                ->with('success', '✅ Registro actualizado correctamente.');
+        }
+
+
 }

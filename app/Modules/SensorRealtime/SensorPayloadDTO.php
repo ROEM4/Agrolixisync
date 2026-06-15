@@ -10,7 +10,7 @@ namespace App\Modules\SensorRealtime;
  * convierten a este DTO antes de cualquier lógica de negocio.
  *
  * Contrato v3 del firmware:
- * { device, ts, ce_s, ce_p, hum_s?, hum_p?, temp_s?, temp_p?, riesgo?, estado? }
+ * { device, ts, ce_s, ce_p, hum_s?, hum_p?, temp_s?, temp_p? }
  */
 final class SensorPayloadDTO
 {
@@ -19,18 +19,16 @@ final class SensorPayloadDTO
         public readonly string  $ts,
         public readonly float   $ce_s,
         public readonly float   $ce_p,
-        public readonly ?float  $hum_s,
-        public readonly ?float  $hum_p,
-        public readonly ?float  $temp_s,
-        public readonly ?float  $temp_p,
-        public readonly int     $riesgo,
-        public readonly string  $estado,
+        public readonly ?float  $hum_s    = null,
+        public readonly ?float  $hum_p    = null,
+        public readonly ?float  $temp_s   = null,
+        public readonly ?float  $temp_p   = null,
+        public readonly int     $riesgo   = 0,
+        public readonly string  $estado   = 'EQUILIBRIO',
     ) {}
 
     /**
      * Construye el DTO desde el array validado del Request.
-     * La normalización de campos legacy ocurre ANTES de llegar aquí
-     * (en NormalizerService), este método solo mapea campos ya limpios.
      */
     public static function fromValidated(array $v): self
     {
@@ -44,7 +42,7 @@ final class SensorPayloadDTO
             temp_s: isset($v['temp_s']) ? (float) $v['temp_s'] : null,
             temp_p: isset($v['temp_p']) ? (float) $v['temp_p'] : null,
             riesgo: (int) ($v['riesgo'] ?? 0),
-            estado: $v['estado'] ?? 'RETENCION',
+            estado: $v['estado'] ?? 'EQUILIBRIO',
         );
     }
 }

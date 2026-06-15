@@ -189,7 +189,7 @@
     <div class="nav-section">Monitoreo</div>
     <a class="nav-link {{ request()->routeIs('dashboard') || request()->routeIs('realtime') || request()->routeIs('monitor') ? 'active' : '' }}"
        href="{{ route('dashboard') }}">
-        <i class="fas fa-satellite-dish"></i> Tiempo Real
+        <i class="fas fa-satellite-dish"></i> Monitoreo en Tiempo Real
         <span class="status-dot" style="margin-left:auto;"></span>
     </a>
 
@@ -225,7 +225,7 @@
     <div class="nav-section">Gestión</div>
     <a class="nav-link {{ request()->routeIs('lotes*') ? 'active' : '' }}"
        href="{{ route('lotes.index') }}">
-        <i class="fas fa-seedling"></i> Lotes
+        <i class="fas fa-seedling"></i> Plantas
     </a>
 
     @if(Auth::user()->role === 'admin')

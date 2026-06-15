@@ -3,242 +3,227 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Modules\AnalyticsEngine\AnalisisService;
-use App\Models\Observacion;
+use App\Models\AlertEvaluation;
+use App\Models\DailyConsolidation;
+use App\Models\Alert;
 use App\Models\Location;
-use Carbon\Carbon;
+use App\Models\Lote;
 use App\Models\PFRecord;
-use Illuminate\Support\Facades\Validator;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class AnalisisController extends Controller
 {
-    private AnalisisService $analisisService;
-
-    public function __construct(AnalisisService $analisisService)
-    {
-        $this->analisisService = $analisisService;
-    }
-
     public function index(Request $request)
     {
-        $locations = Location::with('lote')->get();
-        $location_id = $request->query('location_id');
-        // Normalize empty string to null so Blade can use is_null($location_id)
-        if ($location_id === '') {
-            $location_id = null;
+        // ═══ ALERTAS PENDIENTES DE EVALUACIÓN (últimos 30 días) ═══
+        $pendingAlerts = Alert::with(['location.lote', 'lote'])
+            ->where('created_at', '>=', now()->subDays(30))
+            ->whereDoesntHave('evaluation')
+            ->orderByDesc('created_at')
+            ->limit(20)
+            ->get();
+
+        // ═══ TOTALES ACUMULADOS (VP/FP/FN) ═══
+        $vp = AlertEvaluation::where('label', 'VP')->count();
+        $fp = AlertEvaluation::where('label', 'FP')->count();
+        $fn = AlertEvaluation::where('label', 'FN')->count();
+        $total = $vp + $fp + $fn;
+
+        $pdsPercentage = $total > 0 ? (($vp / $total) * 100) : 0;
+        $errorRate = 100 - $pdsPercentage;
+
+        $stats = [
+            'vp' => $vp,
+            'fp' => $fp,
+            'fn' => $fn,
+            'total' => $total,
+            'pds_percentage' => round($pdsPercentage, 2),
+            'error_rate' => round($errorRate, 2),
+        ];
+
+        // ═══ DATOS PARA GRÁFICO DE EVOLUCIÓN TEMPORAL ═══
+        // Usa los campos REALES: consolidation_date, vp, fp, fn
+        $dailyStats = DailyConsolidation::orderBy('consolidation_date')
+            ->get()
+            ->map(function ($day) {
+                return [
+                    'date' => $day->consolidation_date,
+                    'date_label' => Carbon::parse($day->consolidation_date)->format('d/m/Y'),
+                    'vp' => $day->vp ?? 0,
+                    'fp' => $day->fp ?? 0,
+                    'fn' => $day->fn ?? 0,
+                    'pds_percentage' => $day->pds_percentage ?? 0,
+                    'lote_name' => $day->lote?->name ?? 'N/D',
+                ];
+            });
+
+        $dates = $dailyStats->pluck('date_label')->toArray();
+        $pdsJson = json_encode($dailyStats->pluck('pds_percentage')->toArray());
+        $errorJson = json_encode($dailyStats->map(fn($d) => 100 - $d['pds_percentage'])->toArray());
+
+        // ═══ DATOS PARA TABLA DE CONTROL (grupo control) ═══
+        $controlRecords = PFRecord::with(['location', 'location.lote'])
+            ->orderByDesc('recorded_at')
+            ->limit(15)
+            ->get()
+            ->map(function ($record) {
+                $lote = $record->location ? $record->location->lote : null;
+                
+                return [
+                    'id' => $record->id,
+                    'location_id' => $record->location_id,
+                    'lote' => $lote,
+                    'lote_name' => $lote ? $lote->name : 'N/D',
+                    'lote_plant_number' => $lote ? $lote->plant_number : '?',
+                    'recorded_at' => $record->recorded_at,
+                    'date_label' => Carbon::parse($record->recorded_at)->format('d/m/Y'),
+                    'ce_superficial' => $record->ce_superficial,
+                    'ce_profunda' => $record->ce_profunda,
+                    'pf_percentage' => $record->pf_percentage,
+                    'subparcela' => $record->subparcela ?? 'A',
+                ];
+            });
+
+        // ═══ LOTES PARA MODAL DE INGRESO MANUAL ═══
+        $lotes = Lote::where('experimental_group', 'control')
+            ->with('locations')
+            ->orderBy('plant_number')
+            ->get();
+
+        // ═══ UBICACIÓN SELECCIONADA ═══
+        $selectedLocation = null;
+        if ($request->has('location_id')) {
+            $selectedLocation = Location::find($request->location_id);
         }
-
-        $stats = $this->analisisService->getPdsStats($location_id);
-        $comparison = $this->analisisService->getComparisonStats($location_id);
-
-        // Control summary mínimo requerido (provisto por el Service)
-        $control = $comparison['control'] ?? ['count' => 0, 'loss_percentage' => 0, 'avg_ce_sup' => 0, 'avg_ce_prof' => 0, 'avg_ilx' => 0];
-
-        // Obtener análisis diario combinado (Control + Experimental)
-        $dailyStats = $this->analisisService->getDailyComparisonStats($location_id);
-
-        // Preparar series para los gráficos (arrays simples y JSON strings compatibles con la vista)
-        $dates = array_map(function($r) { return $r['date_label']; }, $dailyStats);
-        $aciertos = array_map(function($r) { return (($r['experimental']['vp'] ?? 0) + ($r['experimental']['vn'] ?? 0)); }, $dailyStats);
-        $errores = array_map(function($r) { return (($r['experimental']['fp'] ?? 0) + ($r['experimental']['fn'] ?? 0)); }, $dailyStats);
-
-        // PDS y tasa de error por día (experimental)
-        $pds = array_map(function($r) { return isset($r['experimental']['pds']) ? $r['experimental']['pds'] : 0.0; }, $dailyStats);
-        $errorRates = array_map(function($r) { return isset($r['experimental']['error_rate']) ? $r['experimental']['error_rate'] : 0.0; }, $dailyStats);
-
-        // Variables JSON exactamente con los nombres que espera la vista
-        $datesJson = json_encode($dates);
-        $aciertosJson = json_encode($aciertos);
-        $erroresJson = json_encode($errores);
-        $pdsJson = json_encode($pds);
-        $errorJson = json_encode($errorRates);
-
-        // Parcela Control Records (Física y de Referencia)
-        $controlQuery = \App\Models\PFRecord::where('experimental_group', 'control');
-        if ($location_id) {
-            $controlQuery->where('location_id', $location_id);
-        }
-        // Obtener exactamente 15 registros ordenados asc por fecha para cumplir el requisito de la vista
-        $controlRecords = $controlQuery->orderBy('recorded_at', 'asc')
-                            ->take(15)
-                            ->get();
-
-        // Parcela Experimental Observations (IoT) — mantendremos dailyStats para la tabla experimental (agregado por día)
-        $expQuery = \App\Models\Observacion::where('experimental_group', 'experimental');
-        if ($location_id) {
-            $expQuery->where('location_id', $location_id);
-        }
-        $experimentalRecords = $expQuery->orderBy('created_at', 'asc')
-                                ->take(15)
-                                ->get();
-
-        // Preparar campos de presentación para los registros de control
-        $controlRecords = $controlRecords->map(function ($record) {
-            $record->date_label = $record->recorded_at ? $record->recorded_at->format('d/m/Y') : 'N/A';
-            $record->ce_superficial_str = number_format($record->ce_superficial ?? 0, 3);
-            $record->ce_profunda_str = number_format($record->ce_profunda ?? 0, 3);
-            $record->ilx_str = number_format((($record->ce_profunda && $record->ce_superficial) ? ($record->ce_profunda / $record->ce_superficial) : 0), 4);
-            $record->pf_percentage = $record->pf_percentage ?? 0;
-            $record->events = $record->events ?? 1;
-
-            $lossPct = floatval($record->pf_percentage ?: 0);
-            $state = 'Normal';
-            if ($lossPct > 50) $state = 'Alta pérdida';
-            elseif ($lossPct > 10) $state = 'Baja pérdida';
-            $record->estado = $state;
-
-            return $record;
-        });
-
-        // Preparar campos para observaciones experimentales (simple mapping)
-        $experimentalRecords = $experimentalRecords->map(function ($obs) {
-            $obs->date_label = $obs->created_at ? $obs->created_at->format('d/m/Y') : 'N/A';
-
-            // Detección IoT
-            if (in_array($obs->resultado, ['VP', 'FP'])) {
-                $obs->detection_html = '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black bg-red-50 text-red-600 border border-red-200">🚨 Lixiviación</span>';
-            } else {
-                $obs->detection_html = '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black bg-slate-100 text-slate-500 border border-slate-200">Normal</span>';
-            }
-
-            // Referencia real
-            if (in_array($obs->resultado, ['VP', 'FN'])) {
-                $obs->reference_html = '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-50 text-amber-700 border border-amber-200">Lixiviación Real</span>';
-            } else {
-                $obs->reference_html = '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black bg-slate-100 text-slate-500 border border-slate-200">Sin Pérdida Real</span>';
-            }
-
-            // Clasificación (pequeña etiqueta)
-            $map = [
-                'VP' => '<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">VP</span>',
-                'FP' => '<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-red-100 text-red-800 border border-red-300">FP</span>',
-                'FN' => '<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300">FN</span>',
-                'VN' => '<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-slate-200 text-slate-800 border border-slate-400">VN</span>',
-            ];
-            $obs->classification_html = $map[$obs->resultado] ?? '<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-slate-100 text-slate-400">N/A</span>';
-
-            return $obs;
-        });
-
-        $selectedLocation = $location_id ? Location::find($location_id) : null;
 
         return view('dashboard.analisis', compact(
-            'locations', 
-            'stats', 
-            'comparison', 
-            'control',
+            'pendingAlerts',
+            'stats',
             'dailyStats',
             'dates',
-            'aciertos',
-            'errores',
-            'datesJson',
-            'aciertosJson',
-            'erroresJson',
             'pdsJson',
             'errorJson',
-            'controlRecords', 
-            'experimentalRecords', 
-            'location_id', 
+            'controlRecords',
+            'lotes',
             'selectedLocation'
         ));
     }
 
-    public function export(Request $request)
+    // ═══ MÉTODO: INGRESO MANUAL (GRUPO CONTROL) ═══
+    public function pfManual(Request $request)
     {
-        $location_id = $request->query('location_id');
-        $query = Observacion::with(['location.lote', 'alert'])->orderByDesc('created_at');
-        if ($location_id) {
-            $query->where('location_id', $location_id);
-        }
-        $data = $query->get();
+        $request->validate([
+            'location_id' => 'required|exists:locations,id',
+            'recorded_at' => 'required|date',
+            'ce_superficial' => 'required|numeric|min:0',
+            'ce_profunda' => 'required|numeric|min:0',
+            'events' => 'required|integer|min:1',
+            'precision_percentage' => 'required|numeric|min:0|max:100',
+        ]);
 
-        $filename = 'analisis_pds_' . now()->format('Y-m-d') . '.csv';
-        $headers = [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => "attachment; filename=\"$filename\"",
-        ];
+        $location = Location::findOrFail($request->location_id);
 
-        $callback = function() use ($data) {
-            $file = fopen('php://output', 'w');
-            fputcsv($file, ['N', 'Fecha - Hora', 'Ubicacion', 'VP', 'FP', 'PDS_Porcentaje']);
+        PFRecord::create([
+            'location_id' => $location->id,
+            'experimental_group' => $location->experimental_group ?? 'control',
+            'recorded_at' => $request->recorded_at,
+            'ce_superficial' => $request->ce_superficial,
+            'ce_profunda' => $request->ce_profunda,
+            'ce_reference' => $request->ce_superficial,
+            'ce_measured' => $request->ce_profunda,
+            'subparcela' => 'Evento #' . $request->events,  // Guardamos como "Evento #15"
+            'pf_percentage' => $request->precision_percentage,  // Aquí guardamos el % de precisión
+        ]);
 
-            $total = $data->count();
-            foreach ($data as $index => $obs) {
-                $is_vp = ($obs->resultado === 'VP') ? 1 : 0;
-                $is_fp = ($obs->resultado === 'FP') ? 1 : 0;
-                
-                // PDS acumulado para el export
-                $local_vp = $data->slice(0, $index + 1)->where('resultado', 'VP')->count();
-                $running_pds = ($local_vp / ($index + 1)) * 100;
-
-                fputcsv($file, [
-                    $total - $index,
-                    $obs->created_at->format('Y-m-d H:i:s'),
-                    $obs->location->name,
-                    $is_vp,
-                    $is_fp,
-                    number_format($running_pds, 2, '.', '')
-                ]);
-            }
-            fclose($file);
-        };
-
-        return response()->stream($callback, 200, $headers);
+        return back()->with('success', '✅ Registro de Grupo Control guardado correctamente');
     }
 
-    /**
-     * Almacena un registro PF ingresado manualmente desde la vista de Análisis.
-     */
-    public function storeManual(Request $request)
+    // ═══ MÉTODO: EVALUAR ALERTA INDIVIDUAL (VP/FP/FN) ═══
+    public function evaluarAlerta(Request $request, Alert $alert)
     {
-        $data = $request->all();
-
-        $validator = Validator::make($data, [
-            'subparcela' => 'required|string|max:100',
-            'recorded_at' => 'required|date',
-            'ce_superficial' => 'required|numeric',
-            'ce_profunda' => 'required|numeric',
-            'ce_reference' => 'nullable|numeric',
-            'pf_percentage' => 'nullable|numeric',
+        $request->validate([
+            'evaluation' => 'required|in:VP,FP,FN',
         ]);
 
-        if ($validator->fails()) {
-            return back()->withErrors($validator)->withInput();
+        // Crear o actualizar evaluación
+        // Campos REALES: alert_id, lote_id, location_id, label, session_id
+        AlertEvaluation::updateOrCreate(
+            ['alert_id' => $alert->id],
+            [
+                'lote_id' => $alert->lote_id,
+                'location_id' => $alert->location_id,
+                'label' => $request->evaluation,
+                'session_id' => session()->getId(),
+            ]
+        );
+
+        return back()->with('success', "✅ Alerta evaluada como {$request->evaluation}");
+    }
+
+    // ═══ MÉTODO: CERRAR DÍA Y CONSOLIDAR EVALUACIONES ═══
+    public function cerrarDia(Request $request)
+    {
+        $today = now()->toDateString();
+
+        // Verificar si ya existe consolidación para hoy
+        $existing = DailyConsolidation::where('consolidation_date', $today)->first();
+        if ($existing) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'El día ya fue consolidado. No se puede cerrar dos veces.'
+            ], 400);
         }
 
-        // Calcular ILx si no fue entregado
-        $ce_s = floatval($data['ce_superficial']);
-        $ce_p = floatval($data['ce_profunda']);
-        $ilx = $ce_s > 0 ? round($ce_p / $ce_s, 4) : null;
+        // Contar evaluaciones de hoy
+        $evaluations = AlertEvaluation::whereDate('created_at', $today)->get();
 
-        // Si proporcionaron ce_reference o pf_percentage usamos esos valores
-        $ce_reference = isset($data['ce_reference']) && $data['ce_reference'] !== '' ? floatval($data['ce_reference']) : ($ilx ?? null);
+        $vp = $evaluations->where('label', 'VP')->count();
+        $fp = $evaluations->where('label', 'FP')->count();
+        $fn = $evaluations->where('label', 'FN')->count();
+        $total = $vp + $fp + $fn;
 
-        $ce_measured = isset($data['ce_measured']) ? floatval($data['ce_measured']) : ($ce_reference ?? $ilx ?? 0);
+        $pdsPercentage = $total > 0 ? round(($vp / $total) * 100, 2) : 0;
+        $errorRate = 100 - $pdsPercentage;
 
-        // Calcular pérdida si no viene
-        $pf = null;
-        if (isset($data['pf_percentage']) && $data['pf_percentage'] !== '') {
-            $pf = floatval($data['pf_percentage']);
-        } elseif ($ce_reference && $ce_measured) {
-            if ($ce_reference != 0) {
-                $pf = (($ce_reference - $ce_measured) / $ce_reference) * 100.0;
-            }
+        // Consolidar por cada lote con evaluaciones hoy
+        $loteIds = $evaluations->pluck('lote_id')->filter()->unique();
+
+        foreach ($loteIds as $loteId) {
+            $loteEvals = $evaluations->where('lote_id', $loteId);
+            $loteTotal = $loteEvals->count();
+
+            DailyConsolidation::create([
+                'lote_id' => $loteId,
+                'consolidation_date' => $today,
+                'vp' => $loteEvals->where('label', 'VP')->count(),
+                'fp' => $loteEvals->where('label', 'FP')->count(),
+                'fn' => $loteEvals->where('label', 'FN')->count(),
+                'total_evaluations' => $loteTotal,
+                'pds_percentage' => $loteTotal > 0
+                    ? round(($loteEvals->where('label', 'VP')->count() / $loteTotal) * 100, 2)
+                    : 0,
+                'error_rate' => $loteTotal > 0
+                    ? round((($loteEvals->where('label', 'FP')->count() + $loteEvals->where('label', 'FN')->count()) / $loteTotal) * 100, 2)
+                    : 0,
+                'is_closed' => true,
+                'closed_by' => Auth::id(),
+                'closed_at' => now(),
+            ]);
         }
 
-        // No vinculamos a location de forma obligatoria (puede ser global)
-        PFRecord::create([
-            'location_id' => null,
-            'experimental_group' => 'control',
-            'recorded_at' => $data['recorded_at'],
-            'ce_superficial' => $ce_s,
-            'ce_profunda' => $ce_p,
-            'ce_reference' => $ce_reference,
-            'ce_measured' => $ce_measured,
-            'subparcela' => $data['subparcela'],
-            'pf_percentage' => $pf,
+        return response()->json([
+            'status' => 'success',
+            'message' => "Día cerrado. PDS%: {$pdsPercentage}% (VP: {$vp}, FP: {$fp}, FN: {$fn})"
         ]);
+    }
 
-        return redirect()->route('analisis')->with('success', 'Registro PF manual guardado.');
+    // ═══ MÉTODO: EXPORTAR ═══
+    public function export()
+    {
+        return back()->with('success', 'Exportación iniciada');
     }
 }

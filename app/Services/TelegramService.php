@@ -1,21 +1,21 @@
 <?php
- 
+
 namespace App\Services;
- 
+
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
- 
+
 class TelegramService
 {
     protected $token;
     protected $chatId;
- 
+
     public function __construct()
     {
         $this->token = config('services.telegram.bot_token') ?? env('TELEGRAM_BOT_TOKEN');
         $this->chatId = config('services.telegram.chat_id') ?? env('TELEGRAM_CHAT_ID');
     }
- 
+
     /**
      * Enviar mensaje genérico a Telegram
      */
@@ -25,7 +25,7 @@ class TelegramService
             Log::warning('Telegram Service: Configuración incompleta (Falta TOKEN o CHAT_ID)');
             return false;
         }
- 
+
         try {
             $response = Http::withoutVerifying()->post("https://api.telegram.org/bot{$this->token}/sendMessage", [
                 'chat_id' => $this->chatId,
@@ -33,45 +33,78 @@ class TelegramService
                 'parse_mode' => $parseMode,
                 'disable_web_page_preview' => true,
             ]);
- 
+
             if (!$response->successful()) {
                 Log::error('Telegram Service Error: ' . $response->status() . ' - ' . $response->body());
                 return false;
             }
- 
+
             return true;
         } catch (\Exception $e) {
             Log::error('Telegram Service Exception: ' . $e->getMessage());
             return false;
         }
     }
- 
+
     /**
-     * Envía una alerta de lixiviación estructurada
+     * Enviar mensaje con botones inline (para alertas interactivas)
+     */
+    public function sendMessageWithButtons(string $message, array $buttons, string $parseMode = 'HTML'): bool
+    {
+        if (!$this->token || !$this->chatId) {
+            Log::warning('Telegram Service: Configuración incompleta (Falta TOKEN o CHAT_ID)');
+            return false;
+        }
+
+        try {
+            $response = Http::withoutVerifying()->post("https://api.telegram.org/bot{$this->token}/sendMessage", [
+                'chat_id' => $this->chatId,
+                'text' => $message,
+                'parse_mode' => $parseMode,
+                'disable_web_page_preview' => true,
+                'reply_markup' => json_encode([
+                    'inline_keyboard' => $buttons
+                ])
+            ]);
+
+            if (!$response->successful()) {
+                Log::error('Telegram Service Error (buttons): ' . $response->status() . ' - ' . $response->body());
+                return false;
+            }
+
+            return true;
+        } catch (\Exception $e) {
+            Log::error('Telegram Service Exception (buttons): ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Envía una alerta de lixiviación estructurada CON BOTONES INTERACTIVOS
      */
     public function sendAlert($alert, bool $isUpdate = false): bool
     {
         $loteName = $alert->location->lote->name ?? 'N/A';
         $locationName = $alert->location->name ?? 'N/A';
         $level = strtoupper($alert->severity ?? $alert->level ?? 'BAJO');
- 
+
         $emoji = '🟢';
         if (in_array($level, ['ALTO', 'CRÍTICO'])) $emoji = '🔴';
         elseif ($level === 'MEDIO') $emoji = '🟠';
- 
+
         $duration = "";
         if ($isUpdate && $alert->tiempo_riesgo) {
             $diff = now()->diffInMinutes($alert->tiempo_riesgo);
             $duration = " (⚠️ PERSISTE: {$diff} min)";
         }
- 
+
         $trend = "";
         if ($alert->ce_actual && $alert->ce_anterior) {
             $diff = $alert->ce_actual - $alert->ce_anterior;
             $trendEmoji = $diff > 0 ? '📈' : ($diff < 0 ? '📉' : '➡️');
             $trend = "\n{$trendEmoji} <b>Tendencia CE:</b> " . ($diff > 0 ? '+' : '') . number_format($diff, 4) . " dS/m";
         }
- 
+
         $title = $isUpdate ? "🔄 <b>ACTUALIZACIÓN DE ALERTA</b>" : "{$emoji} <b>ALERTA DE LIXIVIACIÓN</b>";
         
         $msg = "{$title}\n"
@@ -92,7 +125,37 @@ class TelegramService
              . "<b>" . ($alert->recommendation ?? 'Revisar sistema de riego y drenaje.') . "</b>\n"
              . "───────────────────\n"
              . "📅 <i>Generado el: " . now()->format('d/m/Y H:i:s') . "</i>";
- 
-        return $this->sendMessage($msg);
+
+        // ═══════════════════════════════════════════════════════════════
+        // 🎯 BOTONES INTERACTIVOS — Acción rápida desde Telegram
+        // ═══════════════════════════════════════════════════════════════
+        $appUrl = rtrim(config('app.url'), '/');
+        $alertUrl = "{$appUrl}/alertas?alert_id={$alert->id}";
+        $dashboardUrl = "{$appUrl}/alertas";
+        $quickResolveUrl = "{$appUrl}/alertas/{$alert->id}/quick-resolve";
+
+        $buttons = [
+            // Fila 1: Ver detalle de esta alerta específica
+            [
+                [
+                    'text' => '🔍 Ver esta Alerta',
+                    'url' => $alertUrl
+                ]
+            ],
+            // Fila 2: Dashboard completo + Marcar resuelta rápido
+            [
+                [
+                    'text' => '📊 Ver Dashboard',
+                    'url' => $dashboardUrl
+                ],
+                [
+                    'text' => '✅ Marcar Resuelta',
+                    'url' => $quickResolveUrl
+                ]
+            ]
+        ];
+
+        // Enviar con botones interactivos
+        return $this->sendMessageWithButtons($msg, $buttons);
     }
 }

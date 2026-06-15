@@ -2,13 +2,11 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PFRecord extends Model
 {
-    use HasFactory;
-
     protected $table = 'pf_records';
 
     protected $fillable = [
@@ -25,12 +23,14 @@ class PFRecord extends Model
 
     protected $casts = [
         'recorded_at' => 'datetime',
+        'ce_superficial' => 'float',
+        'ce_profunda' => 'float',
         'ce_reference' => 'float',
         'ce_measured' => 'float',
         'pf_percentage' => 'float',
     ];
 
-    public function location()
+    public function location(): BelongsTo
     {
         return $this->belongsTo(Location::class);
     }
