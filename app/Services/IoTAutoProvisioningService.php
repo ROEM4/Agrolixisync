@@ -3,8 +3,8 @@
 namespace App\Services;
 
 use App\Models\Sensor;
-use App\Models\Location;
-use App\Models\Lote;
+use App\Models\Ubicacion;
+use App\Models\Planta;
 use Illuminate\Support\Facades\Log;
 
 class IoTAutoProvisioningService
@@ -16,19 +16,19 @@ class IoTAutoProvisioningService
         // 🔥 NORMALIZACIÓN DEL DEVICE CODE
         $device_code = $this->cleanDevice($device_code);
 
-        // 1. Resolver Location
+        // 1. Resolver Ubicacion
         $location = $this->resolveLocation($device_code);
 
         // 2. Sensores
         $sensor_sup = $this->resolveSensor(
             code: $device_code . '-SUP',
-            depth: 20,
+            depth: 20.0,
             location: $location
         );
 
         $sensor_prof = $this->resolveSensor(
             code: $device_code . '-PROF',
-            depth: 60,
+            depth: 60.0,
             location: $location
         );
 
@@ -39,47 +39,20 @@ class IoTAutoProvisioningService
     }
 
     /**
-     * LOCATION CLEAN (SIN BASURA DE AUTO-ESP32)
+     * UBICACIÓN — solo busca por codigo_dispositivo, no crea
      */
-    private function resolveLocation(string $device_code): Location
+    private function resolveLocation(string $device_code): Ubicacion
     {
         $device_code = $this->cleanDevice($device_code);
 
-        // Buscar por device limpio
-        $location = Location::where('device_code', $device_code)->first();
+        $location = Ubicacion::where('codigo_dispositivo', $device_code)->first();
 
-        if ($location) {
-            return $location;
+        if (!$location) {
+            throw new \RuntimeException(
+                "Device code '{$device_code}' no está registrado en ninguna planta. "
+                . "Regístralo primero en el módulo Plantas (Grupo Experimental)."
+            );
         }
-
-        // Crear LOTE base (limpio)
-        $lote = Lote::firstOrCreate(
-            ['name' => $this->generateLoteName($device_code)],
-            [
-                'crop_type' => 'palta',
-                'user_id' => 1,
-            ]
-        );
-
-        // Crear LOCATION limpia (ESTO ES LO IMPORTANTE)
-        $location = Location::create([
-            'lote_id' => $lote->id,
-
-            // 🔥 NOMBRE BONITO PARA UI (SELECT)
-            'name' => $this->generateLocationName($device_code),
-
-            // 🔥 GUARDAR DEVICE REAL SEPARADO (RECOMENDADO)
-            'device_code' => $device_code,
-
-            'latitude' => -25.2637,
-            'longitude' => -57.5759,
-            'is_active' => true,
-        ]);
-
-        Log::info('Location created clean', [
-            'location_id' => $location->id,
-            'name' => $location->name,
-        ]);
 
         return $location;
     }
@@ -87,10 +60,10 @@ class IoTAutoProvisioningService
     /**
      * SENSOR CREATION
      */
-    private function resolveSensor(string $code, float $depth, Location $location): Sensor
+    private function resolveSensor(string $code, float $depth, Ubicacion $location): Sensor
     {
-        $sensor = Sensor::where('location_id', $location->id)
-            ->where('depth', $depth)
+        $sensor = Sensor::where('ubicacion_id', $location->id)
+            ->where('profundidad', $depth)
             ->first();
 
         if ($sensor) {
@@ -98,14 +71,14 @@ class IoTAutoProvisioningService
         }
 
         return Sensor::create([
-            'code' => $code,
-            'name' => $this->generateSensorName($location->name, $depth),
-            'location_id' => $location->id,
-            'depth' => $depth,
-            'group_type' => 'EXPERIMENTAL',
-            'is_active' => true,
-            'status' => 'active',
-            'notes' => 'Auto-provisioned',
+            'codigo' => $code,
+            'nombre' => $this->generateSensorName($location->nombre, $depth),
+            'ubicacion_id' => $location->id,
+            'profundidad' => $depth,
+            'tipo_grupo' => 'EXPERIMENTAL',
+            'activo' => true,
+            'estado' => 'activo',
+            'notas' => 'Auto-provisioned',
         ]);
     }
 
@@ -120,16 +93,16 @@ class IoTAutoProvisioningService
     }
 
     /**
-     * NOMBRE LOTE LIMPIO
+     * NOMBRE PLANTA LIMPIO
      */
-    private function generateLoteName(string $device_code): string
+    private function generatePlantaNombre(string $device_code): string
     {
         $clean = $this->cleanDevice($device_code);
         return $clean;
     }
 
     /**
-     * NOMBRE LOCATION BONITO PARA UI (SELECT)
+     * NOMBRE UBICACIÓN BONITO PARA UI (SELECT)
      */
     private function generateLocationName(string $device_code): string
     {

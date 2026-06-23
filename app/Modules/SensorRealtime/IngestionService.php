@@ -2,7 +2,7 @@
 
 namespace App\Modules\SensorRealtime;
 
-use App\Models\Reading;
+use App\Models\Lectura;
 use App\Services\IoTAutoProvisioningService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -10,8 +10,8 @@ use Illuminate\Support\Facades\Log;
 /**
  * IngestionService
  *
- * Responsabilidad: persistir las lecturas del ESP32 en la tabla readings.
- * Maneja idempotencia, transacción y actualización de last_reading_at.
+ * Responsabilidad: persistir las lecturas del ESP32 en la tabla lecturas.
+ * Maneja idempotencia, transacción y actualización de ultima_lectura.
  * No contiene lógica de análisis (eso es AnalyticsEngine).
  */
 class IngestionService
@@ -32,28 +32,28 @@ class IngestionService
         $sensor_prof = $sensors['profundo'];
 
         // Idempotencia: mismo sensor + mismo timestamp = duplicado
-        if (Reading::where('sensor_id', $sensor_sup->id)->where('recorded_at', $dto->ts)->exists()) {
+        if (Lectura::where('sensor_id', $sensor_sup->id)->where('fecha_registro', $dto->ts)->exists()) {
             Log::info('Duplicate reading, ACK sent', ['device' => $dto->device, 'ts' => $dto->ts]);
             return ['status' => 'duplicate', 'ack' => true, 'ack_token' => 'dup'];
         }
 
         $readings = DB::transaction(function () use ($sensor_sup, $sensor_prof, $dto) {
-            $sup = Reading::create([
-                'sensor_id'    => $sensor_sup->id,
-                'conductivity' => $dto->ce_s,
-                'humidity'     => $dto->hum_s,
-                'temperature'  => $dto->temp_s,
-                'recorded_at'  => $dto->ts,
+            $sup = Lectura::create([
+                'sensor_id'     => $sensor_sup->id,
+                'conductividad' => $dto->ce_s,
+                'humedad'       => $dto->hum_s,
+                'temperatura'   => $dto->temp_s,
+                'fecha_registro' => $dto->ts,
             ]);
-            $prof = Reading::create([
-                'sensor_id'    => $sensor_prof->id,
-                'conductivity' => $dto->ce_p,
-                'humidity'     => $dto->hum_p,
-                'temperature'  => $dto->temp_p,
-                'recorded_at'  => $dto->ts,
+            $prof = Lectura::create([
+                'sensor_id'     => $sensor_prof->id,
+                'conductividad' => $dto->ce_p,
+                'humedad'       => $dto->hum_p,
+                'temperatura'   => $dto->temp_p,
+                'fecha_registro' => $dto->ts,
             ]);
-            $sensor_sup->update(['last_reading_at'  => now()]);
-            $sensor_prof->update(['last_reading_at' => now()]);
+            $sensor_sup->update(['ultima_lectura'  => now()]);
+            $sensor_prof->update(['ultima_lectura' => now()]);
             return ['sup' => $sup, 'prof' => $prof];
         });
 
@@ -63,7 +63,7 @@ class IngestionService
             'ack_token'   => $readings['sup']->id . ':' . $readings['prof']->id,
             'sup_id'      => $readings['sup']->id,
             'prof_id'     => $readings['prof']->id,
-            'location_id' => $sensor_sup->location_id,
+            'location_id' => $sensor_sup->ubicacion_id,
         ];
     }
 }

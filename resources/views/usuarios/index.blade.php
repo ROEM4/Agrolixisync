@@ -71,21 +71,23 @@
                     <th>Nombre</th>
                     <th>Correo Electrónico</th>
                     <th>Rol</th>
-                    <th>Registrado</th>
+                    <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse($usuarios as $u)
                 <tr>
                     <td style="color:#9ca3af;font-family:monospace;">{{ $loop->iteration }}</td>
-                    <td style="font-weight:600;color:#1a472a;">{{ $u->name }}</td>
+                    <td style="font-weight:600;color:#1a472a;">{{ $u->nombre }}</td>
                     <td style="font-family:monospace;font-size:0.8rem;color:#6b7280;">{{ $u->email }}</td>
                     <td>
-                        <span class="badge-role badge-{{ $u->role }}">
-                            {{ $u->role === 'admin' ? '🔑 Admin' : '🌾 Agricultor' }}
+                        <span class="badge-role badge-{{ $u->rol }}">
+                            {{ $u->rol === 'admin' ? '🔑 Admin' : '🌾 Agricultor' }}
                         </span>
                     </td>
-                    <td style="font-size:0.8rem;color:#9ca3af;">{{ $u->created_at->format('d/m/Y') }}</td>
+                    <td>
+                        <a href="{{ route('usuarios.edit', $u->id) }}" class="btn-edit" title="Editar"><i class="fas fa-pencil-alt"></i></a>
+                    </td>
                 </tr>
                 @empty
                 <tr>

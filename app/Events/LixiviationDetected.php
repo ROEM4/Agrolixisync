@@ -2,13 +2,11 @@
 
 namespace App\Events;
 
-use App\Models\Location;
-use App\Models\Analysis;
-use App\Models\Alert;
+use App\Models\Ubicacion;
+use App\Models\AnalisisLixiviacion;
+use App\Models\Alerta;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
@@ -16,25 +14,22 @@ use Illuminate\Queue\SerializesModels;
 /**
  * ══════════════════════════════════════════════════════════════
  * EVENT: LixiviationDetected
- * 
+ *
  * Se dispara cuando se detecta LIXIVIACIÓN
- * (Delta CE > umbral O Ratio > 1.2)
- * 
+ * (ILx > 1.20  O  ILx < 0.70)
+ *
  * BROADCAST A:
- *   - Canal: locations.{location_id}
- *   - Audiencia: SOLO USUARIOS AUTENTICADOS (PrivateChannel)
- * 
+ *   - Canal: ubicaciones.{ubicacion_id}
+ *   - Audiencia: Usuarios autenticados viendo esa ubicación
+ *
  * PAYLOAD:
  *   {
- *     "location": { location },
- *     "analysis": { analysis con delta, ratio, risk },
- *     "alert": { alerta creada },
- *     "severity": "ALTO/MEDIO/BAJO",
- *     "timestamp": "ISO8601"
+ *     "ubicacion":  { ubicacion },
+ *     "analisis":   { analisis con ilx, delta, riesgo },
+ *     "alerta":     { alerta creada },
+ *     "severidad":  "ALTO/MEDIO/BAJO",
+ *     "timestamp":  "ISO8601"
  *   }
- * 
- * NOTA: Los dashboards escuchando este canal recibirán
- *       actualización instantánea + pueden reproducir sonido
  * ══════════════════════════════════════════════════════════════
  */
 class LixiviationDetected implements ShouldBroadcast
@@ -42,106 +37,89 @@ class LixiviationDetected implements ShouldBroadcast
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public function __construct(
-        public Location $location,
-        public Analysis $analysis,
-        public Alert $alert
+        public Ubicacion           $ubicacion,
+        public AnalisisLixiviacion $analisis,
+        public Alerta              $alerta
     ) {}
 
     /**
-     * Get the channels the event should broadcast on.
-     *
-     * @return array<int, \Illuminate\Broadcasting\Channel>
+     * Canal de broadcast.
      */
     public function broadcastOn(): array
     {
         return [
-            new Channel('locations.' . $this->location->id),
+            new Channel('ubicaciones.' . $this->ubicacion->id),
         ];
     }
 
     /**
-     * Get the data to broadcast.
+     * Datos que se envían al canal.
      */
     public function broadcastWith(): array
     {
+        $ceS = (float) $this->analisis->conductividad_superficial;
+        $ceP = (float) $this->analisis->conductividad_profundo;
+
         return [
             'event_type' => 'LIXIVIATION_ALERT',
-            'location' => [
-                'id' => $this->location->id,
-                'name' => $this->location->name,
-                'coordinates' => [
-                    'lat' => $this->location->latitude,
-                    'lon' => $this->location->longitude,
-                ],
+            'ubicacion'  => [
+                'id'     => $this->ubicacion->id,
+                'nombre' => $this->ubicacion->nombre,
             ],
-            'analysis' => [
-                'id' => $this->analysis->id,
-                'ce_superficial' => (float)$this->analysis->conductivity_superficial,
-                'ce_profundo' => (float)$this->analysis->conductivity_profundo,
-                'delta_conductivity' => (float)$this->analysis->delta_conductivity,
-                'threshold_used' => (float)$this->analysis->threshold_used,
-                'ratio_ce' => ($this->analysis->conductivity_superficial > 0) ?
-                    (float)($this->analysis->conductivity_profundo / $this->analysis->conductivity_superficial) :
-                    0,
-                'risk_level' => $this->analysis->risk_level,
-                'risk_percentage' => (float)$this->analysis->risk_percentage,
-                'analyzed_at' => $this->analysis->analyzed_at->toIso8601String(),
+            'analisis' => [
+                'id'                     => $this->analisis->id,
+                'conductividad_superficial' => $ceS,
+                'conductividad_profundo'    => $ceP,
+                'delta_conductividad'       => (float) $this->analisis->delta_conductividad,
+                'ilx'                       => (float) $this->analisis->ilx,
+                'ilx_estado'                => $this->analisis->ilx_estado,
+                'nivel_riesgo'              => $this->analisis->nivel_riesgo,
+                'porcentaje_riesgo'         => (float) $this->analisis->porcentaje_riesgo,
+                'fecha_analisis'            => $this->analisis->fecha_analisis?->toIso8601String(),
             ],
-            'alert' => [
-                'id' => $this->alert->id,
-                'type' => $this->alert->type,
-                'description' => $this->alert->description,
-                'severity' => $this->alert->severity,
-                'status' => $this->alert->status,
+            'alerta' => [
+                'id'        => $this->alerta->id,
+                'tipo'      => $this->alerta->tipo,
+                'descripcion'=> $this->alerta->descripcion,
+                'severidad' => $this->alerta->severidad,
+                'estado'    => $this->alerta->estado,
             ],
-            'severity' => $this->analysis->risk_level,
-            'icon' => $this->getAlertIcon(),
-            'color' => $this->getAlertColor(),
-            'sound' => $this->shouldPlaySound(),
+            'severidad' => $this->analisis->nivel_riesgo,
+            'icono'     => $this->getAlertIcon(),
+            'color'     => $this->getAlertColor(),
+            'sonido'    => $this->shouldPlaySound(),
             'timestamp' => now()->toIso8601String(),
         ];
     }
 
     /**
-     * Get the event broadcast name.
+     * Nombre del evento broadcast.
      */
     public function broadcastAs(): string
     {
-        return 'lixiviation-detected';
+        return 'lixiviacion-detectada';
     }
 
-    /**
-     * Get icon based on risk level
-     */
     private function getAlertIcon(): string
     {
-        return match ($this->analysis->risk_level) {
-            'ALTO' => '🔴',
-            'MEDIO' => '🟡',
-            'BAJO' => '🟢',
-            default => '⚪',
+        return match ($this->analisis->nivel_riesgo) {
+            'ALTO'   => '🔴',
+            'MEDIO'  => '🟡',
+            default  => '🟢',
         };
     }
 
-    /**
-     * Get color based on risk level
-     */
     private function getAlertColor(): string
     {
-        return match ($this->analysis->risk_level) {
-            'ALTO' => '#dc3545',      // Red
-            'MEDIO' => '#ffc107',     // Yellow
-            'BAJO' => '#28a745',      // Green
-            default => '#6c757d',     // Gray
+        return match ($this->analisis->nivel_riesgo) {
+            'ALTO'  => '#dc3545',
+            'MEDIO' => '#ffc107',
+            default => '#28a745',
         };
     }
 
-    /**
-     * Should play sound alert
-     */
     private function shouldPlaySound(): bool
     {
-        // Solo reproducir sonido para ALTO riesgo
-        return $this->analysis->risk_level === 'ALTO';
+        return $this->analisis->nivel_riesgo === 'ALTO';
     }
 }

@@ -255,8 +255,8 @@
     {{-- Header Section --}}
     <div class="page-header">
         <div>
-            <h1>Tiempo de Detección</h1>
-            <p>Indicador del tiempo promedio de detección de eventos de Lixiviación</p>
+            <h1>Tiempo promedio de Detección</h1>
+            <p>3er Indicador</p>
         </div>
         <div style="display:flex; gap: 0.75rem;">
             <a href="{{ route('detection_time.export', ['location_id' => $location_id, 'filter' => $filter]) }}" class="btn btn-light shadow-sm" style="border-radius:10px; font-weight:600; font-size:0.85rem; text-decoration: none; display: flex; align-items: center; justify-content: center; padding: 0.5rem 1rem;">
@@ -285,8 +285,8 @@
         <label class="block text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest">📡 Modo de Visualización</label>
         <div class="flex gap-3">
             @php
-                $defaultIotLoc = $lotesGE->first()?->locations->first()?->id;
-                $defaultManualLoc = $lotesGC->first()?->locations->first()?->id;
+                $defaultIotLoc = $plantasGE->first()?->ubicaciones->first()?->id;
+                $defaultManualLoc = $plantasGC->first()?->ubicaciones->first()?->id;
             @endphp
             
             <a href="{{ route('detection_time', ['mode' => 'iot', 'location_id' => ($location_id && !$isCtrl) ? $location_id : $defaultIotLoc, 'filter' => $filter]) }}" 
@@ -325,22 +325,22 @@
                     
                     @if($mode === 'iot')
                         <optgroup label="🔵 GRUPO EXPERIMENTAL (IoT)">
-                            @foreach($lotesGE as $lote)
-                                @php $loc = $lote->locations->first(); @endphp
+                            @foreach($plantasGE as $planta)
+                                @php $loc = $planta->ubicaciones->first(); @endphp
                                 @if($loc)
                                     <option value="{{ $loc->id }}" {{ $location_id == $loc->id ? 'selected' : '' }}>
-                                        🌳 {{ $lote->name }} (Planta {{ $lote->plant_number }})
+                                        🌳 {{ $planta->nombre }} (Planta {{ $planta->numero_planta }}){{ $loc->codigo_dispositivo ? ' — ' . $loc->codigo_dispositivo : '' }}
                                     </option>
                                 @endif
                             @endforeach
                         </optgroup>
                     @else
                         <optgroup label="🟢 GRUPO CONTROL (Manual)">
-                            @foreach($lotesGC as $lote)
-                                @php $loc = $lote->locations->first(); @endphp
+                            @foreach($plantasGC as $planta)
+                                @php $loc = $planta->ubicaciones->first(); @endphp
                                 @if($loc)
                                     <option value="{{ $loc->id }}" {{ $location_id == $loc->id ? 'selected' : '' }}>
-                                        🌳 {{ $lote->name }} (Planta {{ $lote->plant_number }})
+                                        🌳 {{ $planta->nombre }} (Planta {{ $planta->numero_planta }})
                                     </option>
                                 @endif
                             @endforeach
@@ -354,7 +354,7 @@
     {{-- ═══════════════════════════════════════════════════════════════ --}}
     {{-- 🎯 PANEL SUPERIOR: MODO MANUAL O IoT                          --}}
     {{-- ═══════════════════════════════════════════════════════════════ --}}
-    @if(isset($selectedLocation))
+    @if(isset($ubicacionSeleccionada))
         <div class="mb-8 p-8 rounded-3xl border {{ $mode === 'manual' ? 'border-amber-200/70 bg-gradient-to-br from-amber-50 to-white shadow-md shadow-amber-100/40' : 'border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white shadow-md shadow-emerald-100/40' }}">
             <div class="flex items-center justify-between mb-6">
                 <div class="flex items-center gap-3">
@@ -363,7 +363,7 @@
                     </span>
                     <div>
                         <h3 class="text-xl font-black {{ $mode === 'manual' ? 'text-amber-800' : 'text-emerald-800' }}">
-                            {{ $mode === 'manual' ? '📝 Modo Manual — ' : '📡 Modo IoT — ' }}{{ $selectedLocation->lote->name ?? 'N/D' }}
+                            {{ $mode === 'manual' ? '📝 Modo Manual — ' : '📡 Modo IoT — ' }}{{ $ubicacionSeleccionada->planta->nombre ?? 'N/D' }}
                         </h3>
                         <p class="text-sm font-medium {{ $mode === 'manual' ? 'text-amber-600' : 'text-emerald-600' }}">
                             {{ $mode === 'manual' ? 'Registre manualmente los tiempos de detección de eventos' : 'Tiempos calculados automáticamente desde las alertas del sistema.' }}
@@ -431,7 +431,11 @@
             <div class="filter-group">
                 <label>Planta Actual</label>
                 <div class="px-4 py-2 bg-slate-50 rounded-xl font-bold text-slate-700">
-                    🌳 {{ $selectedLocation->lote->name ?? 'N/D' }}
+                    @php $sel = $selectedLocation ?? null; @endphp
+                    🌳 {{ $sel?->planta?->nombre ?? 'N/D' }}
+                    @if($sel?->planta?->numero_planta)
+                        (Planta {{ $sel->planta->numero_planta }})
+                    @endif
                 </div>
             </div>
             <div class="filter-group">
@@ -562,16 +566,16 @@
         <form action="{{ route('detection_time.store_manual') }}" method="POST">
             @csrf
             
-            {{-- 🌳 SELECTOR DE PLANTA GC --}}
+            {{-- ✅ CAMBIADO: location_id → ubicacion_id --}}
             <div class="mb-4">
                 <label class="text-xs font-black text-slate-500 uppercase tracking-wider">🌳 Planta de palto (Grupo Control)</label>
-                <select name="location_id" class="w-full p-3 border border-slate-200 rounded-xl mt-1 focus:ring-2 focus:ring-amber-500 focus:border-transparent" required>
+                <select name="ubicacion_id" class="w-full p-3 border border-slate-200 rounded-xl mt-1 focus:ring-2 focus:ring-amber-500 focus:border-transparent" required>
                     <option value="">Seleccione planta</option>
-                    @foreach($lotesGC as $lote)
-                        @php $loc = $lote->locations->first(); @endphp
+                    @foreach($plantasGC as $planta)
+                        @php $loc = $planta->ubicaciones->first(); @endphp
                         @if($loc)
-                            <option value="{{ $loc->id }}" {{ ($selectedLocation && $selectedLocation->id == $loc->id) ? 'selected' : '' }}>
-                                🌳 {{ $lote->name }} (Planta {{ $lote->plant_number }})
+                            <option value="{{ $loc->id }}" {{ (isset($ubicacionSeleccionada) && $ubicacionSeleccionada->id == $loc->id) ? 'selected' : '' }}>
+                                🌳 {{ $planta->nombre }} (Planta {{ $planta->numero_planta }})
                             </option>
                         @endif
                     @endforeach
@@ -585,9 +589,9 @@
                 </div>
 
                 <div>
-                    <label class="text-xs font-black text-slate-500 uppercase tracking-wider">🏷️ Subparcela (ej: S1, S2)</label>
-                    <input type="text" name="subparcela" value="{{ old('subparcela') }}" required placeholder="ej: S1" pattern="[Ss]\d+" title="Debe usar la letra 'S' seguida de un número"
-                           class="w-full p-3 border border-slate-200 rounded-xl mt-1 focus:ring-2 focus:ring-amber-500 focus:border-transparent" />
+                    <label class="text-xs font-black text-slate-500 uppercase tracking-wider">🔢 Cantidad de Eventos</label>
+                    <input type="number" name="cantidad_eventos" value="{{ old('cantidad_eventos', 1) }}" min="1" required placeholder="Ej: 3"
+                        class="w-full p-3 border border-slate-200 rounded-xl mt-1 focus:ring-2 focus:ring-amber-500 focus:border-transparent" />
                 </div>
 
                 <div>
@@ -635,6 +639,21 @@ function openManualModal() {
 function closeManualModal() {
     document.getElementById('manualModal').classList.remove('active');
 }
+
+// En modo IoT: auto-seleccionar la planta marcada en Tiempo Real (localStorage)
+(function syncRealtimeSelection() {
+    const mode = '{{ $mode }}';
+    if (mode !== 'iot') return;
+    const savedLoc = localStorage.getItem('agro_loc');
+    if (!savedLoc) return;
+    const selector = document.getElementById('location-selector');
+    if (!selector) return;
+    const opt = selector.querySelector(`option[value="${savedLoc}"]`);
+    if (opt && selector.value !== savedLoc) {
+        selector.value = savedLoc;
+        selector.closest('form').submit();
+    }
+})();
 
 function updateModalTAR() {
     const ti = document.getElementById('modal-ti').value;

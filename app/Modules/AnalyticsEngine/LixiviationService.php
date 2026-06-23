@@ -2,10 +2,11 @@
 
 namespace App\Modules\AnalyticsEngine;
 
-use App\Models\Alert;
-use App\Models\Analysis;
-use App\Models\Reading;
+use App\Models\Alerta;
+use App\Models\AnalisisLixiviacion;
+use App\Models\Lectura;
 use App\Models\Sensor;
+use App\Models\Ubicacion;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -30,11 +31,10 @@ class LixiviationService
 {
     private AnalisisService $analisisService;
 
-    // ILx thresholds (único criterio de decisión)
-    private const ILX_LIX_ALTA  = 1.20;
-    private const ILX_LIX       = 1.05;
-    private const ILX_EQUIL_LOW = 0.90;
-    private const ILX_RET_LOW   = 0.70;
+    // ILx thresholds — alineados con alertas.blade.php (modal de configuración)
+    private const ILX_ALTA_MIN  = 1.00;  // ILx > 1.0          → Lixiviación Alta
+    private const ILX_MEDIA_MIN = 0.60;  // 0.6 <= ILx <= 1.0  → Lixiviación Media
+    private const ILX_BAJA_MAX  = 0.40;  // ILx < 0.4          → Lixiviación Baja
 
     public function __construct(AnalisisService $analisisService)
     {
@@ -44,22 +44,22 @@ class LixiviationService
     public function analyze(Sensor $sensor_sup, Sensor $sensor_prof): void
     {
         try {
-            $r_sup  = Reading::where('sensor_id', $sensor_sup->id)->orderByDesc('id')->first();
-            $r_prof = Reading::where('sensor_id', $sensor_prof->id)->orderByDesc('id')->first();
+            $r_sup  = Lectura::where('sensor_id', $sensor_sup->id)->orderByDesc('id')->first();
+            $r_prof = Lectura::where('sensor_id', $sensor_prof->id)->orderByDesc('id')->first();
 
             if (!$r_sup || !$r_prof) return;
 
             // Rechazar si los timestamps difieren más de 5 minutos
-            if (abs($r_sup->recorded_at->diffInSeconds($r_prof->recorded_at)) > 300) {
+            if (abs($r_sup->fecha_registro->diffInSeconds($r_prof->fecha_registro)) > 300) {
                 Log::warning('LixiviationService: readings not synchronized', [
-                    'sup'  => $r_sup->recorded_at,
-                    'prof' => $r_prof->recorded_at,
+                    'sup'  => $r_sup->fecha_registro,
+                    'prof' => $r_prof->fecha_registro,
                 ]);
                 return;
             }
 
-            $ce_s = (float) $r_sup->conductivity;
-            $ce_p = (float) $r_prof->conductivity;
+            $ce_s = (float) $r_sup->conductividad;
+            $ce_p = (float) $r_prof->conductividad;
 
             // ── INDICADOR PRINCIPAL: ILx ──────────────────────────────────
             $ilx   = $ce_s > 0 ? round($ce_p / $ce_s, 4) : 0.0;
@@ -67,87 +67,92 @@ class LixiviationService
             // ── INDICADOR SECUNDARIO: ΔCE (complemento visual) ───────────
             $delta = round($ce_s - $ce_p, 4);
 
-            [$ilx_estado, $detected, $risk] = $this->classifyByILx($ilx);
+            [$ilx_estado, $detected, $risk, $config_key] = $this->classifyByILx($ilx);
 
-            $location = $sensor_sup->location;
+            $location = $sensor_sup->ubicacion;
             $now      = now();
 
             // Lectura superficial anterior (para ΔCE temporal en alertas)
-            $prev_r_sup  = Reading::where('sensor_id', $sensor_sup->id)
+            $prev_r_sup  = Lectura::where('sensor_id', $sensor_sup->id)
                 ->where('id', '<', $r_sup->id)->orderByDesc('id')->first();
-            $ce_anterior = $prev_r_sup ? (float) $prev_r_sup->conductivity : $ce_s;
+            $ce_anterior = $prev_r_sup ? (float) $prev_r_sup->conductividad : $ce_s;
             $delta_ce    = round($ce_s - $ce_anterior, 4);
 
-            $analysis = Analysis::create([
-                'lote_id'                  => $location->lote_id,
-                'location_id'              => $location->id,
-                'experimental_group'       => $location->experimental_group,
+            $analysis = AnalisisLixiviacion::create([
+                'planta_id'                => $location->planta_id,
+                'ubicacion_id'             => $location->id,
+                'grupo_experimental'       => $location->grupo_experimental,
                 'sensor_superficial_id'    => $sensor_sup->id,
                 'sensor_profundo_id'       => $sensor_prof->id,
-                'reading_superficial_id'   => $r_sup->id,
-                'reading_profundo_id'      => $r_prof->id,
-                'conductivity_superficial' => $ce_s,
-                'conductivity_profundo'    => $ce_p,
-                'delta_conductivity'       => $delta,      // ΔCE — complementario
+                'lectura_superficial_id'   => $r_sup->id,
+                'lectura_profundo_id'      => $r_prof->id,
+                'conductividad_superficial' => $ce_s,
+                'conductividad_profundo'    => $ce_p,
+                'delta_conductividad'       => $delta,      // ΔCE — complementario
                 'ilx'                      => $ilx,        // ILx — PRINCIPAL
                 'ilx_estado'               => $ilx_estado, // Estado agronómico
-                'threshold_used'           => self::ILX_LIX_ALTA, // umbral de referencia
-                'lixiviation_detected'     => $detected,
-                'risk_level'               => $risk,
-                'risk_percentage'          => $this->calcRiskPct($ilx),
-                'analyzed_at'              => $now,
-                'event_detected_at'        => $now,
-                'alert_generated_at'       => $detected ? $now : null,
-                'event_type'               => 'LIXIVIATION',
+                'umbral_usado'             => self::ILX_ALTA_MIN,
+                'lixiviacion_detectada'     => $detected,
+                'nivel_riesgo'               => $risk,
+                'porcentaje_riesgo'          => $this->calcRiskPct($ilx),
+                'fecha_analisis'              => $now,
+                'fecha_deteccion'        => $now,
+                'fecha_generacion_alerta'       => $detected ? $now : null,
+                'tipo_evento'               => 'LIXIVIATION',
             ]);
 
-            $shouldAlert = $detected || $risk === 'MEDIO';
+            $shouldAlert = $detected;
 
-            // Validar preferencias de alerta de la ubicación
-            if ($shouldAlert) {
-                $settings = $location->alert_settings ?? [
-                    'lixiviacion_alta' => true,
-                    'lixiviacion' => true,
-                    'acumulacion' => true,
-                ];
-
-                $settingKey = strtolower(str_replace([' ', 'Ó'], ['_', 'o'], $ilx_estado));
-                if (!($settings[$settingKey] ?? true)) {
-                    $shouldAlert = false;
-                    Log::info("Alerta omitida por configuración del usuario: {$ilx_estado}", ['location' => $location->name]);
+            // Respetar configuración guardada en alertas.blade.php para esta planta
+            if ($shouldAlert && $config_key !== null) {
+                $settings = is_array($location->configuracion_alertas ?? null)
+                    ? $location->configuracion_alertas
+                    : [];
+                // Si el usuario configuró al menos una clave, respetarla;
+                // si no hay ninguna configuración guardada, se notifica por defecto.
+                if (!empty($settings)) {
+                    $shouldAlert = $settings[$config_key] ?? false;
                 }
             }
 
             if ($shouldAlert) {
-                $existing = Alert::where('location_id', $location->id)->where('status', 'OPEN')->first();
+                $existing = Alerta::where('ubicacion_id', $location->id)->where('estado', 'ABIERTA')->first();
 
                 if (!$existing) {
-                    Alert::create([
-                        'lote_id'       => $location->lote_id,
-                        'location_id'   => $location->id,
-                        'analysis_id'   => $analysis->id,
-                        'type'          => 'lixiviacion',
-                        'description'   => sprintf(
+                    $newAlert = Alerta::create([
+                        'planta_id'     => $location->planta_id,
+                        'ubicacion_id'   => $location->id,
+                        'analisis_lixiviacion_id'   => $analysis->id,
+                        'tipo'          => 'lixiviacion',
+                        'descripcion'   => sprintf(
                             'ILx=%.4f (%s) | ΔCE=%.4f dS/m',
                             $ilx, $ilx_estado, $delta
                         ),
-                        'severity'      => $risk,
-                        'level'         => $risk,
-                        'status'        => 'OPEN',
+                        'severidad'      => $risk,
+                        'nivel'         => $risk,
+                        'estado'        => 'ABIERTA',
                         'ce_actual'     => $ce_s,
                         'ce_anterior'   => $ce_anterior,
                         'delta_ce'      => $delta_ce,
-                        'tiempo_riesgo' => $r_sup->recorded_at,
+                        'tiempo_riesgo' => $r_sup->fecha_registro,
                         'tiempo_alerta' => $now,
                     ]);
 
                     Log::warning('ALERTA REGISTRADA: ' . $risk, [
-                        'location'  => $location->name,
+                        'location'  => $location->nombre,
                         'ilx'       => $ilx,
                         'ilx_estado'=> $ilx_estado,
-                        'ce_s'      => $ce_s,
-                        'ce_p'      => $ce_p,
                     ]);
+
+                    // ✅ Notificar Telegram con la nueva alerta
+                    try {
+                        $newAlert->load('ubicacion.planta');
+                        $alertService = resolve(\App\Services\AlertService::class);
+                        $alertService->dispatch($newAlert, false);
+                    } catch (\Exception $e) {
+                        Log::error('Error notificando Telegram (nueva alerta): ' . $e->getMessage());
+                    }
+
                 } else {
                     $this->updateExistingAlert($existing, $risk, $ce_s, $ilx, $ilx_estado);
                 }
@@ -169,27 +174,35 @@ class LixiviationService
      *
      * @return array{string, bool, string}  [ilx_estado, lixiviation_detected, risk_level]
      */
+    /**
+     * Clasificación según umbrales de alertas.blade.php:
+     *   ILx > 1.0           → lixiviacion_alta  (ALTO)
+     *   0.6 <= ILx <= 1.0   → lixiviacion_media (MEDIO)
+     *   ILx < 0.4           → lixiviacion_baja  (BAJO)
+     *   0.4 <= ILx < 0.6    → zona normal, sin alerta
+     *
+     * @return array{string, bool, string, string}  [estado, detectada, risk, config_key]
+     */
     private function classifyByILx(float $ilx): array
     {
-        if ($ilx > self::ILX_LIX_ALTA) {
-            return ['LIXIVIACIÓN ALTA', true,  'ALTO'];
+        // ILx > 1.0 → Lixiviación Alta
+        if ($ilx > self::ILX_ALTA_MIN) {
+            return ['LIXIVIACIÓN ALTA',  true,  'ALTO',  'lixiviacion_alta'];
         }
-        if ($ilx > self::ILX_LIX) {
-            return ['LIXIVIACIÓN',      true,  'MEDIO'];
+        // 0.6 <= ILx <= 1.0 → Lixiviación Media
+        if ($ilx >= self::ILX_MEDIA_MIN) {
+            return ['LIXIVIACIÓN MEDIA', true,  'MEDIO', 'lixiviacion_media'];
         }
-        if ($ilx >= self::ILX_EQUIL_LOW) {
-            return ['EQUILIBRIO',       false, 'BAJO'];
+        // 0.4 <= ILx < 0.6 → zona sin alerta
+        if ($ilx >= self::ILX_BAJA_MAX) {
+            return ['EQUILIBRIO',        false, 'BAJO',  null];
         }
-        if ($ilx >= self::ILX_RET_LOW) {
-            return ['RETENCIÓN',        false, 'BAJO'];
-        }
-        // ILx < 0.7 → ACUMULACIÓN (sales acumuladas, también requiere atención)
-        return ['ACUMULACIÓN',          true,  'MEDIO'];
+        // ILx < 0.4 → Lixiviación Baja (acumulación)
+        return ['LIXIVIACIÓN BAJA',      true,  'BAJO',  'lixiviacion_baja'];
     }
 
     /**
-     * Calcula un porcentaje de riesgo proporcional a la desviación del ILx respecto al equilibrio.
-     * Zona de equilibrio: 0.9 – 1.05. La desviación máxima esperada es ±0.5.
+     * Calculates risk percentage.
      */
     private function calcRiskPct(float $ilx): float
     {
@@ -204,10 +217,10 @@ class LixiviationService
     // ACTUALIZACIÓN DE ALERTA EXISTENTE
     // ═══════════════════════════════════════════════════════════════════════
 
-    private function updateExistingAlert(Alert $existing, string $newRisk, float $ce_s, float $ilx, string $ilx_estado): void
+    private function updateExistingAlert(Alerta $existing, string $newRisk, float $ce_s, float $ilx, string $ilx_estado): void
     {
         $riskWeights   = ['BAJO' => 0, 'MEDIO' => 1, 'ALTO' => 2, 'CRÍTICO' => 3];
-        $oldRisk       = strtoupper($existing->level ?? 'BAJO');
+        $oldRisk       = strtoupper($existing->nivel ?? 'BAJO');
         $riskIncreased = ($riskWeights[$newRisk] ?? 0) > ($riskWeights[$oldRisk] ?? 0);
         $riskPersists  = ($riskWeights[$newRisk] ?? 0) >= 1;
 
@@ -216,15 +229,15 @@ class LixiviationService
             $updates['ce_actual'] = $ce_s;
         }
         if ($riskIncreased) {
-            $updates['level']    = $newRisk;
-            $updates['severity'] = $newRisk;
+            $updates['nivel']    = $newRisk;
+            $updates['severidad'] = $newRisk;
         }
         if (!empty($updates)) {
             $existing->update($updates);
         }
 
         // Re-notificar si el riesgo aumentó o llevan ≥ 20 min sin notificar
-        $lastNotify       = $existing->notified_at ? \Carbon\Carbon::parse($existing->notified_at) : null;
+        $lastNotify       = $existing->updated_at;
         $minutesSinceLast = $lastNotify ? $lastNotify->diffInMinutes(now()) : 999;
 
         if ($riskIncreased || ($riskPersists && $minutesSinceLast >= 20)) {
@@ -233,7 +246,7 @@ class LixiviationService
                 $success  = $telegram->sendAlert($existing, true);
 
                 if ($success) {
-                    $existing->updateQuietly(['notified_at' => now()]);
+                    $existing->touch(); // Touch to update updated_at timestamp to avoid spam
                     Log::info('Actualización Telegram enviada', [
                         'alert_id'  => $existing->id,
                         'ilx'       => $ilx,

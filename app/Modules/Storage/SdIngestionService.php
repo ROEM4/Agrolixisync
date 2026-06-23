@@ -2,7 +2,7 @@
 
 namespace App\Modules\Storage;
 
-use App\Models\Reading;
+use App\Models\Lectura;
 use App\Services\IoTAutoProvisioningService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -51,17 +51,17 @@ class SdIngestionService
                 $sensor      = $depth_int <= 30 ? $sensors['superficial'] : $sensors['profundo'];
                 $recorded_at = Carbon::parse(trim($timestamp));
 
-                if (Reading::where('sensor_id', $sensor->id)->where('recorded_at', $recorded_at)->exists()) {
+                if (Lectura::where('sensor_id', $sensor->id)->where('fecha_registro', $recorded_at)->exists()) {
                     $skipped++;
                     continue;
                 }
 
-                Reading::create([
-                    'sensor_id'    => $sensor->id,
-                    'conductivity' => trim($conductivity),
-                    'humidity'     => trim($humidity) ?: null,
-                    'temperature'  => trim($temperature) ?: null,
-                    'recorded_at'  => $recorded_at,
+                Lectura::create([
+                    'sensor_id'     => $sensor->id,
+                    'conductividad' => trim($conductivity),
+                    'humedad'       => trim($humidity) ?: null,
+                    'temperatura'   => trim($temperature) ?: null,
+                    'fecha_registro' => $recorded_at,
                 ]);
                 $imported++;
 

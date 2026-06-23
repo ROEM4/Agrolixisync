@@ -84,9 +84,10 @@ class TelegramService
      */
     public function sendAlert($alert, bool $isUpdate = false): bool
     {
-        $loteName = $alert->location->lote->name ?? 'N/A';
-        $locationName = $alert->location->name ?? 'N/A';
-        $level = strtoupper($alert->severity ?? $alert->level ?? 'BAJO');
+        $loteName = $alert->ubicacion->planta->nombre ?? 'N/A';
+        $locationName = $alert->ubicacion->nombre ?? 'N/A';
+        $deviceCode = $alert->ubicacion->codigo_dispositivo ?? 'N/D';
+        $level = strtoupper($alert->severidad ?? $alert->nivel ?? 'BAJO');
 
         $emoji = '🟢';
         if (in_array($level, ['ALTO', 'CRÍTICO'])) $emoji = '🔴';
@@ -109,8 +110,9 @@ class TelegramService
         
         $msg = "{$title}\n"
              . "───────────────────\n"
-             . "📍 <b>Lote:</b> {$loteName}\n"
+             . "📍 <b>Planta:</b> {$loteName}\n"
              . "📍 <b>Ubicación:</b> {$locationName}\n"
+             . "📍 <b>Device Code:</b> {$deviceCode}\n"
              . "⚠️ <b>Nivel de Riesgo:</b> <code>{$level}</code>{$duration}\n"
              . "───────────────────\n"
              . "📊 <b>Métricas de Control:</b>\n"
@@ -119,10 +121,8 @@ class TelegramService
              . "• <b>Δ CE (S-P):</b> " . number_format($alert->delta_ce ?? 0, 4) . " dS/m\n"
              . "• <b>Tiempo (TAR):</b> " . ($alert->tar ?? '--') . " seg\n"
              . "───────────────────\n"
-             . "📝 <b>Detalle Técnico:</b>\n"
-             . "<i>" . ($alert->description ?? 'Detección automática por sistema de monitoreo.') . "</i>\n\n"
-             . "💡 <b>Recomendación:</b>\n"
-             . "<b>" . ($alert->recommendation ?? 'Revisar sistema de riego y drenaje.') . "</b>\n"
+             . "📝 <b>Detalle Técnico y Recomendación:</b>\n"
+             . "<i>" . ($alert->descripcion ?? 'Detección automática por sistema de monitoreo.') . "</i>\n"
              . "───────────────────\n"
              . "📅 <i>Generado el: " . now()->format('d/m/Y H:i:s') . "</i>";
 

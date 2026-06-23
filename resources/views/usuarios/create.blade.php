@@ -71,12 +71,12 @@
             @csrf
             <div class="field">
                 <label>Nombre Completo</label>
-                <input type="text" name="name" value="{{ old('name') }}" required 
+                <input type="text" name="nombre" value="{{ old('nombre') }}" required 
                        placeholder="Ej: Juan Pérez"
                        pattern="^[A-Za-zÑñáéíóúÁÉÍÓÚ\s]+$"
                        oninput="this.value = this.value.replace(/[0-9]/g, '')"
                        title="El nombre no debe contener números">
-                @error('name') <div class="error">{{ $message }}</div> @enderror
+                @error('nombre') <div class="error">{{ $message }}</div> @enderror
             </div>
             <div class="field">
                 <label>Correo Electrónico</label>
@@ -85,13 +85,22 @@
             </div>
             <div class="field">
                 <label>Contraseña</label>
-                <input type="password" name="password" placeholder="Mínimo 8 caracteres">
+                <input type="password" name="password" placeholder="Mínimo 6 caracteres">
                 <div class="hint">Dejar vacío para usar 'password' por defecto</div>
                 @error('password') <div class="error">{{ $message }}</div> @enderror
             </div>
             <div class="field">
                 <label>Confirmar Contraseña</label>
                 <input type="password" name="password_confirmation" placeholder="Repetir contraseña">
+            </div>
+            <div class="field">
+                <label>Rol</label>
+                <select name="rol" required>
+                    <option value="" disabled {{ old('rol') ? '' : 'selected' }}>— Seleccionar rol —</option>
+                    <option value="admin" {{ old('rol') === 'admin' ? 'selected' : '' }}>🔑 Admin</option>
+                    <option value="agricultor" {{ old('rol') === 'agricultor' ? 'selected' : '' }}>🌾 Agricultor</option>
+                </select>
+                @error('rol') <div class="error">{{ $message }}</div> @enderror
             </div>
             <div class="actions">
                 <a href="{{ route('usuarios.index') }}" class="btn-cancel">← Cancelar</a>

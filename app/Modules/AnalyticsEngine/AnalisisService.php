@@ -2,10 +2,10 @@
 
 namespace App\Modules\AnalyticsEngine;
 
-use App\Models\Alert;
-use App\Models\Observacion;
-use App\Models\Analysis;
-use App\Models\PFRecord;
+use App\Models\Alerta;
+use App\Models\ObservacionCampo;
+use App\Models\AnalisisLixiviacion;
+use App\Models\RegistroPorcentajePerdida;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -17,20 +17,21 @@ class AnalisisService
      * 1. EVALUACIÓN DE ALERTAS (VP / FP)
      * ============================================================
      */
-    public function evaluateOpenAlerts(int $location_id, float $current_ce_s, Analysis $current_analysis): void
+    public function evaluateOpenAlerts(int $ubicacion_id, float $current_ce_s, AnalisisLixiviacion $current_analysis): void
     {
-        $open_alerts = Alert::where('location_id', $location_id)
-            ->where('status', 'OPEN')
+        $open_alerts = Alerta::where('ubicacion_id', $ubicacion_id)
+            ->where('estado', 'ABIERTA')
             ->get();
 
         foreach ($open_alerts as $alert) {
-
-            $alert->resolve('Valores regresaron a la normalidad.');
-            $alert->status = 'CLOSED';
+            $alert->resuelta = true;
+            $alert->fecha_resolucion = now();
+            $alert->notas_resolucion = 'Valores regresaron a la normalidad.';
+            $alert->estado = 'RESUELTA';
             $alert->save();
 
             $start = $alert->tiempo_riesgo ?? $alert->created_at;
-            $end = $current_analysis->event_detected_at ?? now();
+            $end = $current_analysis->fecha_deteccion ?? now();
 
             $duration = $end->diffInMinutes($start);
 
@@ -39,12 +40,12 @@ class AnalisisService
             // Clasificación básica del evento
             $resultado = $duration >= $threshold ? 'VP' : 'FP';
 
-            Observacion::create([
-                'location_id'        => $location_id,
-                'experimental_group' => 'experimental',
-                'alert_id'           => $alert->id,
+            ObservacionCampo::create([
+                'ubicacion_id'       => $ubicacion_id,
+                'grupo_experimental' => 'experimental',
+                'alerta_id'          => $alert->id,
                 'ce_real'            => $current_ce_s,
-                'diagnostico'        => $alert->type ?? 'LIXIVIACION',
+                'diagnostico'        => $alert->tipo ?? 'LIXIVIACION',
                 'resultado'          => $resultado,
             ]);
 
@@ -62,12 +63,12 @@ class AnalisisService
      * ============================================================
      * PDS = VP / (VP + FP + FN)
      */
-    public function getPdsStats(int $location_id = null): array
+    public function getPdsStats(int $ubicacion_id = null): array
     {
-        $q = Observacion::query();
+        $q = ObservacionCampo::query();
 
-        if ($location_id) {
-            $q->where('location_id', $location_id);
+        if ($ubicacion_id) {
+            $q->where('ubicacion_id', $ubicacion_id);
         }
 
         $vp = (clone $q)->where('resultado', 'VP')->count();
@@ -117,21 +118,21 @@ class AnalisisService
      * 3. COMPARACIÓN CONTROL vs EXPERIMENTAL
      * ============================================================
      */
-    public function getComparisonStats(?int $location_id = null): array
+    public function getComparisonStats(?int $ubicacion_id = null): array
     {
-        $control = PFRecord::where('experimental_group', 'control');
-        $exp = PFRecord::where('experimental_group', 'experimental');
+        $control = RegistroPorcentajePerdida::where('grupo_experimental', 'control');
+        $exp = RegistroPorcentajePerdida::where('grupo_experimental', 'experimental');
 
-        if ($location_id) {
-            $control->where('location_id', $location_id);
-            $exp->where('location_id', $location_id);
+        if ($ubicacion_id) {
+            $control->where('ubicacion_id', $ubicacion_id);
+            $exp->where('ubicacion_id', $ubicacion_id);
         }
 
         $control_count = $control->count();
         $exp_count = $exp->count();
 
-        $control_pf = (clone $control)->avg('pf_percentage') ?? 0;
-        $exp_pf = (clone $exp)->avg('pf_percentage') ?? 0;
+        $control_pf = (clone $control)->avg('porcentaje_pf') ?? 0;
+        $exp_pf = (clone $exp)->avg('porcentaje_pf') ?? 0;
 
         return [
             'control' => [
@@ -154,12 +155,12 @@ class AnalisisService
      * 4. ANÁLISIS DIARIO (VP/FP/FN/VN + PDS CORRECTO)
      * ============================================================
      */
-    public function getDailyComparisonStats(?int $location_id = null): array
+    public function getDailyComparisonStats(?int $ubicacion_id = null): array
     {
-        $query = Observacion::where('experimental_group', 'experimental');
+        $query = ObservacionCampo::where('grupo_experimental', 'experimental');
 
-        if ($location_id) {
-            $query->where('location_id', $location_id);
+        if ($ubicacion_id) {
+            $query->where('ubicacion_id', $ubicacion_id);
         }
 
         $rows = [];
@@ -171,7 +172,6 @@ class AnalisisService
             ->pluck('date');
 
         foreach ($dates as $date) {
-
             $day = (clone $query)->whereDate('created_at', $date);
 
             $vp = (clone $day)->where('resultado', 'VP')->count();

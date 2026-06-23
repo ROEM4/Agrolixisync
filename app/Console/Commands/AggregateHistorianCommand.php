@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Location;
+use App\Models\Ubicacion;
 use App\Modules\Historian\HistorianService;
 use Illuminate\Console\Command;
 
@@ -29,8 +29,8 @@ class AggregateHistorianCommand extends Command
         $locationId = $this->option('location');
 
         $locations = $locationId
-            ? Location::where('id', $locationId)->get()
-            : Location::where('is_active', true)->get();
+            ? Ubicacion::where('id', $locationId)->get()
+            : Ubicacion::where('activa', true)->get();
 
         if ($locations->isEmpty()) {
             $this->warn('No hay locations activas.');

@@ -18,7 +18,7 @@ class VerifiedAgricultor
         $user = Auth::user();
 
         // Solo permitir acceso a 'admin' o 'agricultor'
-        if (in_array($user->role, ['admin', 'agricultor'])) {
+        if (in_array($user->rol, ['admin', 'agricultor'])) {
             return $next($request);
         }
 

@@ -1,5 +1,4 @@
 @extends('layouts.app')
-
 @section('title', 'Índice de Lixiviación — AgroLixiSync')
 
 @section('content')
@@ -196,8 +195,8 @@
         <label class="block text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest">📡 Modo de Visualización</label>
         <div class="flex gap-3">
             @php
-                $defaultIotLoc = $lotesGE->first()?->locations->first()?->id;
-                $defaultManualLoc = $lotesGC->first()?->locations->first()?->id;
+                $defaultIotLoc = $plantasGE->first()?->ubicaciones->first()?->id;
+                $defaultManualLoc = $plantasGC->first()?->ubicaciones->first()?->id;
             @endphp
             
             <a href="{{ route('lixiviacion', ['mode' => 'iot', 'location_id' => ($location_id && !$isCtrl) ? $location_id : $defaultIotLoc, 'filter' => $filter]) }}" 
@@ -236,22 +235,22 @@
                     
                     @if($mode === 'iot')
                         <optgroup label="🔵 GRUPO EXPERIMENTAL (IoT)">
-                            @foreach($lotesGE as $lote)
-                                @php $loc = $lote->locations->first(); @endphp
+                            @foreach($plantasGE as $planta)
+                                @php $loc = $planta->ubicaciones->first(); @endphp
                                 @if($loc)
                                     <option value="{{ $loc->id }}" {{ $location_id == $loc->id ? 'selected' : '' }}>
-                                        🌳 {{ $lote->name }} (Planta {{ $lote->plant_number }})
+                                        🌳 {{ $planta->nombre }} (Planta {{ $planta->numero_planta }}){{ $loc->codigo_dispositivo ? ' — ' . $loc->codigo_dispositivo : '' }}
                                     </option>
                                 @endif
                             @endforeach
                         </optgroup>
                     @else
                         <optgroup label="🟢 GRUPO CONTROL (Manual)">
-                            @foreach($lotesGC as $lote)
-                                @php $loc = $lote->locations->first(); @endphp
+                            @foreach($plantasGC as $planta)
+                                @php $loc = $planta->ubicaciones->first(); @endphp
                                 @if($loc)
                                     <option value="{{ $loc->id }}" {{ $location_id == $loc->id ? 'selected' : '' }}>
-                                        🌳 {{ $lote->name }} (Planta {{ $lote->plant_number }})
+                                        🌳 {{ $planta->nombre }} (Planta {{ $planta->numero_planta }})
                                     </option>
                                 @endif
                             @endforeach
@@ -275,7 +274,7 @@
     {{-- ═══════════════════════════════════════════════════════════════ --}}
     {{-- 🎯 PANEL SUPERIOR: MODO MANUAL O IoT                          --}}
     {{-- ═══════════════════════════════════════════════════════════════ --}}
-    @if(isset($selectedLocation))
+    @if(isset($ubicacionSeleccionada))
         <div class="mb-8 p-8 rounded-3xl border {{ $mode === 'manual' ? 'border-amber-200/70 bg-gradient-to-br from-amber-50 to-white shadow-md shadow-amber-100/40' : 'border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white shadow-md shadow-emerald-100/40' }}">
             <div class="flex items-center justify-between mb-6">
                 <div class="flex items-center gap-3">
@@ -284,7 +283,7 @@
                     </span>
                     <div>
                         <h3 class="text-xl font-black {{ $mode === 'manual' ? 'text-amber-800' : 'text-emerald-800' }}">
-                            {{ $mode === 'manual' ? '📝 Modo Manual — ' : '📡 Modo IoT — ' }}{{ $selectedLocation->lote->name ?? 'N/D' }}
+                            {{ $mode === 'manual' ? '📝 Modo Manual — ' : '📡 Modo IoT — ' }}{{ $ubicacionSeleccionada->planta->nombre ?? 'N/D' }}
                         </h3>
                         <p class="text-sm font-medium {{ $mode === 'manual' ? 'text-amber-600' : 'text-emerald-600' }}">
                             {{ $mode === 'manual' ? 'Ingrese las lecturas manuales del conductímetro digital' : 'Datos recolectados por sensores IoT en tiempo real.' }}
@@ -293,6 +292,7 @@
                 </div>
                 
                 @if($mode === 'manual')
+                    {{-- ✅ BOTÓN PARA ABRIR MODAL --}}
                     <button type="button" onclick="openManualModal()" class="px-5 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl font-black text-sm shadow-xl shadow-amber-200 transform hover:-translate-y-1 transition-all flex items-center gap-2">
                         <i class="fas fa-plus"></i> NUEVO REGISTRO MANUAL
                     </button>
@@ -402,28 +402,37 @@
                         @forelse($records as $record)
                             <tr class="hover:bg-slate-50/50 transition-colors">
                                 <td class="px-6 py-4 font-bold">
-                                    🌳 {{ $record->lote->name ?? ($selectedLocation->lote->name ?? 'N/D') }}
+                                    🌳 {{ $record->planta?->nombre ?? ($ubicacionSeleccionada?->planta?->nombre ?? 'N/D') }}
                                 </td>
                                 <td class="px-6 py-4 font-medium">
-                                    {{ \Carbon\Carbon::parse($record->recorded_at)->format('d/m/Y H:i') }}
+                                    {{ \Carbon\Carbon::parse($record->fecha_analisis)->format('d/m/Y') }}
                                 </td>
                                 <td class="px-6 py-4 font-mono text-blue-600">
-                                    {{ number_format($record->ce_superficial, 3) }}
+                                    {{ number_format($record->conductividad_superficial, 3) }}
                                 </td>
                                 <td class="px-6 py-4 font-mono text-emerald-600">
-                                    {{ number_format($record->ce_profunda, 3) }}
+                                    {{ number_format($record->conductividad_profundo, 3) }}
                                 </td>
+                                {{-- ✅ AHORA (correcto) --}}
                                 <td class="px-6 py-4">
                                     @php
-                                        $nivel = $record->nivel ?? 'Media lixiviación';
-                                        $badgeClass = match($nivel) {
-                                            'Alta lixiviación' => 'bg-red-100 text-red-700',
-                                            'Baja lixiviación' => 'bg-slate-100 text-slate-600',
-                                            default => 'bg-amber-100 text-amber-700',
-                                        };
+                                        $ilxValue = (float) ($record->ilx ?? 0);
+                                        
+                                        // Clasificación consistente con el modal
+                                        if ($ilxValue > 1.0) {
+                                            $nivelTexto = 'ALTA LIXIVIACIÓN';
+                                            $badgeClass = 'bg-red-100 text-red-700 border border-red-200';
+                                        } elseif ($ilxValue >= 0.6) {
+                                            $nivelTexto = 'MEDIA LIXIVIACIÓN';
+                                            $badgeClass = 'bg-amber-100 text-amber-700 border border-amber-200';
+                                        } else {
+                                            $nivelTexto = 'BAJA LIXIVIACIÓN';
+                                            $badgeClass = 'bg-emerald-100 text-emerald-700 border border-emerald-200';
+                                        }
                                     @endphp
-                                    <span class="status-badge {{ $badgeClass }}">{{ $nivel }}</span>
+                                    <span class="status-badge {{ $badgeClass }}">{{ $nivelTexto }}</span>
                                 </td>
+
                                 <td class="px-6 py-4 font-mono font-black text-indigo-600">
                                     {{ number_format($record->ilx ?? 0, 3) }}
                                 </td>
@@ -468,11 +477,11 @@
             {{-- 🌳 SELECTOR DE PLANTA GC --}}
             <div class="mb-4">
                 <label class="text-xs font-black text-slate-500 uppercase tracking-wider">🌳 Planta de palto (Grupo Control)</label>
-                <select name="lote_id" class="w-full p-3 border border-slate-200 rounded-xl mt-1 focus:ring-2 focus:ring-amber-500 focus:border-transparent" required>
+                <select name="planta_id" class="w-full p-3 border border-slate-200 rounded-xl mt-1 focus:ring-2 focus:ring-amber-500 focus:border-transparent" required>
                     <option value="">Seleccione planta</option>
-                    @foreach($lotesGC as $lote)
-                        <option value="{{ $lote->id }}" {{ ($selectedLocation && $selectedLocation->lote_id == $lote->id) ? 'selected' : '' }}>
-                            🌳 {{ $lote->name }} (Planta {{ $lote->plant_number }})
+                    @foreach($plantasGC as $planta)
+                        <option value="{{ $planta->id }}" {{ ($ubicacionSeleccionada && $ubicacionSeleccionada->planta_id == $planta->id) ? 'selected' : '' }}>
+                            🌳 {{ $planta->nombre }} (Planta {{ $planta->numero_planta }})
                         </option>
                     @endforeach
                 </select>
@@ -481,7 +490,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="text-xs font-black text-slate-500 uppercase tracking-wider">📅 Fecha y hora</label>
-                    <input type="datetime-local" name="recorded_at" value="{{ date('Y-m-d\TH:i') }}" class="w-full p-3 border border-slate-200 rounded-xl mt-1 focus:ring-2 focus:ring-amber-500 focus:border-transparent" required />
+                    <input type="datetime-local" name="fecha_analisis" value="{{ date('Y-m-d\TH:i') }}" class="w-full p-3 border border-slate-200 rounded-xl mt-1 focus:ring-2 focus:ring-amber-500 focus:border-transparent" required />
                 </div>
 
                 <div>
@@ -491,13 +500,13 @@
 
                 <div>
                     <label class="text-xs font-black text-amber-600 uppercase tracking-wider">CE Superficial (dS/m)</label>
-                    <input type="number" step="0.001" min="0" name="conductivity_superficial" id="modal-ce-sup" oninput="updateModalILx()"
+                    <input type="number" step="0.001" min="0" name="conductividad_superficial" id="modal-ce-sup" oninput="updateModalILx()"
                            class="w-full p-3 border border-amber-100 rounded-xl mt-1 focus:ring-2 focus:ring-amber-500 focus:border-transparent" placeholder="0.000" required />
                 </div>
 
                 <div>
                     <label class="text-xs font-black text-amber-600 uppercase tracking-wider">CE Profunda (dS/m)</label>
-                    <input type="number" step="0.001" min="0" name="conductivity_profundo" id="modal-ce-prof" oninput="updateModalILx()"
+                    <input type="number" step="0.001" min="0" name="conductividad_profundo" id="modal-ce-prof" oninput="updateModalILx()"
                            class="w-full p-3 border border-amber-100 rounded-xl mt-1 focus:ring-2 focus:ring-amber-500 focus:border-transparent" placeholder="0.000" required />
                 </div>
             </div>
@@ -622,16 +631,25 @@ function updateModalILx() {
     
     document.getElementById('modal-ilx-preview').textContent = isNaN(ilx) ? '--' : ilx.toFixed(3);
     
-    const cls = classifyILx(ilx);
+    // ✅ Clasificación consistente
+    let estado, badgeClass;
+    if (isNaN(ilx)) {
+        estado = 'SIN DATOS';
+        badgeClass = 'bg-slate-50 text-slate-600';
+    } else if (ilx > 1.0) {
+        estado = 'ALTA LIXIVIACIÓN';
+        badgeClass = 'bg-red-100 text-red-700';
+    } else if (ilx >= 0.6) {
+        estado = 'MEDIA LIXIVIACIÓN';
+        badgeClass = 'bg-amber-100 text-amber-700';
+    } else {
+        estado = 'BAJA LIXIVIACIÓN';
+        badgeClass = 'bg-emerald-100 text-emerald-700';
+    }
+    
     const badge = document.getElementById('modal-nivel-preview');
-    const colorMap = {
-        high: 'bg-red-50 text-red-600',
-        medium: 'bg-yellow-50 text-yellow-700',
-        low: 'bg-green-50 text-green-600',
-        none: 'bg-slate-50 text-slate-600'
-    };
-    badge.textContent = cls.estado;
-    badge.className = `status-badge ${colorMap[cls.level] || colorMap.none}`;
+    badge.textContent = estado;
+    badge.className = `status-badge ${badgeClass}`;
 }
 
 // Inicialización

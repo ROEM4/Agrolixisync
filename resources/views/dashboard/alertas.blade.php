@@ -163,9 +163,6 @@
     .empty-state i { font-size: 3rem; color: #d1d5db; margin-bottom: 1rem; display: block; }
     .empty-state p { color: #9ca3af; font-size: 1rem; }
 
-    /* ═══════════════════════════════════════════════════════════════
-       🎯 ESTILOS PARA ALERTA RESALTADA (desde Telegram)
-       ═══════════════════════════════════════════════════════════════ */
     @keyframes pulse-highlight {
         0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
         50% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
@@ -218,7 +215,6 @@
     }
     .success-banner i { font-size: 1.3rem; color: #16a34a; }
 
-    /* PDS Badge */
     .pds-badge {
         display: inline-flex;
         align-items: center;
@@ -233,7 +229,6 @@
     .pds-warn { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
     .pds-bad  { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
 
-    /* Modal */
     .modal-overlay {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
         background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000;
@@ -363,13 +358,13 @@
         <div class="filter-section rounded-t-2xl">
             <div class="filter-group">
                 <label>🌳 Planta de Palto (GE)</label>
-                <select id="f-location">
+                <select id="f-location" onchange="onLocationChange(this.value)">
                     <option value="">Todas las plantas</option>
-                    @foreach($lotesGE as $lote)
-                        @php $loc = $lote->locations->first(); @endphp
+                    @foreach($plantasGE as $planta)
+                        @php $loc = $planta->ubicaciones->first(); @endphp
                         @if($loc)
                             <option value="{{ $loc->id }}" {{ $location_id == $loc->id ? 'selected' : '' }}>
-                                🌳 {{ $lote->name }} (Planta {{ $lote->plant_number }})
+                                🌳 {{ $planta->nombre }} (Planta {{ $planta->numero_planta }})
                             </option>
                         @endif
                     @endforeach
@@ -461,16 +456,71 @@
 @push('scripts')
 <script>
 @php
-    $pdsDataDefault = $pdsData ?? ['vp' => 0, 'fp' => 0, 'fn' => 0, 'pds_percentage' => 0];
+    $pdsDataDefault = $pdsData ?? ['vp' => 0, 'fp' => 0, 'total' => 0, 'pds_percentage' => 0];
 @endphp
-const PDS_DATA = @json($pdsDataDefault);
+let PDS_DATA = @json($pdsDataDefault);
 
+// ═══════════════════════════════════════════════════════════════
+// 🔄 SINCRONIZACIÓN CON LOCALSTORAGE
+// ═══════════════════════════════════════════════════════════════
+function onLocationChange(locId) {
+    const url = new URL(window.location.href);
+    
+    if (locId) {
+        localStorage.setItem('agro_loc', locId);
+        url.searchParams.set('location_id', locId);
+    } else {
+        localStorage.removeItem('agro_loc');
+        url.searchParams.delete('location_id');
+    }
+    url.searchParams.set('filter', url.searchParams.get('filter') || 'all');
+    window.location.href = url.toString();
+}
+
+// Al cargar: sincronizar con localStorage
+document.addEventListener('DOMContentLoaded', function() {
+    const selector = document.getElementById('f-location');
+    const currentUrl = new URL(window.location.href);
+    const currentLocId = currentUrl.searchParams.get('location_id');
+    const savedLoc = localStorage.getItem('agro_loc');
+    
+    // Si no hay location_id en URL pero hay en localStorage, recargar
+    if (!currentLocId && savedLoc && selector.querySelector(`option[value="${savedLoc}"]`)) {
+        currentUrl.searchParams.set('location_id', savedLoc);
+        window.location.href = currentUrl.toString();
+        return;
+    }
+    
+    // Sincronizar selector con URL actual
+    if (selector && currentLocId) {
+        selector.value = currentLocId;
+    }
+    
+    // Escuchar cambios desde otras pestañas
+    window.addEventListener('storage', function(e) {
+        if (e.key === 'agro_loc' && e.newValue !== currentLocId) {
+            const url = new URL(window.location.href);
+            if (e.newValue) {
+                url.searchParams.set('location_id', e.newValue);
+            } else {
+                url.searchParams.delete('location_id');
+            }
+            window.location.href = url.toString();
+        }
+    });
+    
+    loadAlerts();
+    setInterval(loadAlerts, 60000);
+});
+
+// ═══════════════════════════════════════════════════════════════
+// 📊 CARGAR Y RENDERIZAR ALERTAS
+// ═══════════════════════════════════════════════════════════════
 async function loadAlerts() {
     const locId  = document.getElementById('f-location').value;
     const risk   = document.getElementById('f-risk').value;
     const status = document.getElementById('f-status').value;
     
-    // Obtener filtro de período de la URL actual
     const urlParams = new URLSearchParams(window.location.search);
     const filter = urlParams.get('filter') || 'all';
 
@@ -482,170 +532,20 @@ async function loadAlerts() {
 
     try {
         const res  = await fetch(url);
-        
-        if (!res.ok) {
-            throw new Error(`Error HTTP: ${res.status}`);
-        }
+        if (!res.ok) throw new Error(`Error HTTP: ${res.status}`);
         
         const json = await res.json();
         const data = json.data || [];
         renderAlerts(data);
         updatePDS();
-        
-        // Feedback visual de actualización exitosa
-        showNotification(' Alertas actualizadas', 'success');
     } catch(e) {
         console.error('Error al cargar alertas:', e);
         document.getElementById('alerts-body').innerHTML = 
             `<tr><td colspan="7" class="empty-state">
                 <i class="fas fa-exclamation-circle" style="color:var(--accent-red);"></i>
                 <p>Error al cargar alertas: ${e.message}</p>
-                <p style="font-size:0.8rem; margin-top:0.5rem;">Verifica que las rutas API estén configuradas.</p>
             </td></tr>`;
-        showNotification(' Error al actualizar', 'error');
     }
-}
-
-async function resolveAlert(id) {
-    if(!confirm('¿Marcar esta alerta como resuelta? Se notificará por Telegram.')) return;
-    
-    try {
-        const res = await fetch(`/api/alerts/${id}/resolve`, {
-            method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            }
-        });
-        
-        if (!res.ok) {
-            throw new Error(`Error HTTP: ${res.status}`);
-        }
-        
-        const json = await res.json();
-        
-        if (json.status === 'success') {
-            showNotification('✅ Alerta resuelta correctamente', 'success');
-            loadAlerts(); // Recargar lista
-        } else {
-            throw new Error(json.message || 'Error desconocido');
-        }
-    } catch (e) {
-        console.error('Error al resolver alerta:', e);
-        showNotification('❌ Error: ' + e.message, 'error');
-    }
-}
-
-async function saveConfig() {
-    const locId = document.getElementById('f-location').value;
-    
-    if (!locId) {
-        showNotification('⚠️ Selecciona una ubicación primero', 'warning');
-        return;
-    }
-    
-    const settings = {
-        lixiviacion_alta:  document.getElementById('cfg-lix-alta').checked,
-        lixiviacion_media: document.getElementById('cfg-lix-media').checked,
-        lixiviacion_baja:  document.getElementById('cfg-lix-baja').checked,
-    };
-
-    try {
-        const res = await fetch(`/api/locations/${locId}/settings`, {
-            method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify(settings)
-        });
-
-        if (!res.ok) {
-            throw new Error(`Error HTTP: ${res.status}`);
-        }
-
-        const json = await res.json();
-        
-        if (json.status === 'success') {
-            // Actualizar datos locales
-            const loc = locationsData.find(l => l.id == locId);
-            if (loc) loc.alert_settings = settings;
-            
-            showNotification('✅ Configuración guardada correctamente', 'success');
-            closeConfig();
-        } else {
-            throw new Error(json.message || 'Error desconocido');
-        }
-    } catch (e) {
-        console.error('Error al guardar configuración:', e);
-        showNotification('❌ Error: ' + e.message, 'error');
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// 🔔 SISTEMA DE NOTIFICACIONES VISUALES
-// ═══════════════════════════════════════════════════════════════
-function showNotification(message, type = 'success') {
-    // Remover notificaciones anteriores
-    const existing = document.querySelector('.toast-notification');
-    if (existing) existing.remove();
-    
-    const colors = {
-        success: { bg: '#dcfce7', border: '#16a34a', text: '#166534', icon: '✅' },
-        error:   { bg: '#fee2e2', border: '#dc2626', text: '#991b1b', icon: '❌' },
-        warning: { bg: '#fef3c7', border: '#d97706', text: '#92400e', icon: '⚠️' },
-    };
-    
-    const color = colors[type] || colors.success;
-    
-    const toast = document.createElement('div');
-    toast.className = 'toast-notification';
-    toast.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: ${color.bg};
-        border-left: 4px solid ${color.border};
-        color: ${color.text};
-        padding: 1rem 1.5rem;
-        border-radius: 12px;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-        z-index: 9999;
-        font-weight: 600;
-        font-size: 0.9rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        animation: slideIn 0.3s ease-out;
-    `;
-    toast.innerHTML = `<span>${color.icon}</span><span>${message}</span>`;
-    
-    document.body.appendChild(toast);
-    
-    // Auto-remover después de 3 segundos
-    setTimeout(() => {
-        toast.style.animation = 'slideOut 0.3s ease-out';
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
-}
-
-// Agregar animaciones CSS
-if (!document.getElementById('toast-animations')) {
-    const style = document.createElement('style');
-    style.id = 'toast-animations';
-    style.textContent = `
-        @keyframes slideIn {
-            from { transform: translateX(400px); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        @keyframes slideOut {
-            from { transform: translateX(0); opacity: 1; }
-            to { transform: translateX(400px); opacity: 0; }
-        }
-    `;
-    document.head.appendChild(style);
 }
 
 function updatePDS() {
@@ -655,13 +555,13 @@ function updatePDS() {
     
     if (pds >= 80) {
         badge.className = 'pds-badge pds-good';
-        badge.innerHTML = `✔ VP:${PDS_DATA.vp} | FP:${PDS_DATA.fp} | FN:${PDS_DATA.fn}`;
+        badge.innerHTML = `✔ VP:${PDS_DATA.vp} | FP:${PDS_DATA.fp} | Total:${PDS_DATA.total || (PDS_DATA.vp + PDS_DATA.fp)} | ${pds.toFixed(1)}%`;
     } else if (pds >= 60) {
         badge.className = 'pds-badge pds-warn';
-        badge.innerHTML = `⚠ VP:${PDS_DATA.vp} | FP:${PDS_DATA.fp} | FN:${PDS_DATA.fn}`;
+        badge.innerHTML = `⚠ VP:${PDS_DATA.vp} | FP:${PDS_DATA.fp} | Total:${PDS_DATA.total || (PDS_DATA.vp + PDS_DATA.fp)} | ${pds.toFixed(1)}%`;
     } else {
         badge.className = 'pds-badge pds-bad';
-        badge.innerHTML = `✘ VP:${PDS_DATA.vp} | FP:${PDS_DATA.fp} | FN:${PDS_DATA.fn}`;
+        badge.innerHTML = `✘ VP:${PDS_DATA.vp} | FP:${PDS_DATA.fp} | Total:${PDS_DATA.total || (PDS_DATA.vp + PDS_DATA.fp)} | ${pds.toFixed(1)}%`;
     }
 }
 
@@ -671,7 +571,6 @@ function renderAlerts(alerts) {
     const urlParams = new URLSearchParams(window.location.search);
     const highlightId = urlParams.get('alert_id');
     
-    // Update KPIs
     document.getElementById('kpi-total').textContent  = alerts.length;
     document.getElementById('kpi-alto').textContent   = alerts.filter(a => ['ALTO', 'CRÍTICO'].includes((a.severity||a.level||'').toUpperCase())).length;
     document.getElementById('kpi-open').textContent   = alerts.filter(a => !a.is_resolved).length;
@@ -700,7 +599,6 @@ function renderAlerts(alerts) {
             ? '<span class="telegram-badge">📱 DESDE TELEGRAM</span>' 
             : '';
         
-        // ✅ USAR FECHA REAL DE LA BD (no hardcodeada)
         const createdAt = new Date(a.created_at);
         const dateStr = createdAt.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
         const timeStr = createdAt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -718,18 +616,16 @@ function renderAlerts(alerts) {
             }
         }
 
-        // ✅ USAR NOMBRE REAL DEL LOTE
-        const planta = a.location && a.location.lote 
-            ? `${a.location.lote.name} (Planta ${a.location.lote.plant_number || a.location.lote.id})`
+        const planta = a.ubicacion && a.ubicacion.planta 
+            ? `${a.ubicacion.planta.nombre} (Planta ${a.ubicacion.planta.numero_planta || a.ubicacion.planta.id})`
             : (a.subparcela || 'N/D');
         
-        // ✅ Evaluar si ya fue evaluada (VP/FP/FN)
         const evalBadge = a.evaluation 
             ? `<span class="badge badge-eval">${a.evaluation.label}</span>`
-            : `<button onclick="goToEval(${a.id})" class="btn-eval"><i class="fas fa-graduation-cap"></i> Evaluar</button>`;
+            : `<button onclick="goToEval(${a.id}, ${a.ubicacion_id})" class="btn-eval"><i class="fas fa-graduation-cap"></i> Evaluar</button>`;
 
-        const resolveBtn = isOpen 
-            ? `<button onclick="resolveAlert(${a.id})" class="btn btn-sm btn-outline-success" style="border-radius:8px; font-size:0.7rem; font-weight:700;">
+        const resolveBtn = isOpen && a.evaluation
+            ? `<button onclick="resolveAlertNow(${a.id})" class="btn btn-sm btn-outline-success" style="border-radius:8px; font-size:0.7rem; font-weight:700;">
                 <i class="fas fa-check"></i> Resolver
                </button>`
             : '';
@@ -774,34 +670,34 @@ function renderAlerts(alerts) {
     }
 }
 
-function goToEval(alertId) {
-    window.location.href = `/analisis?highlight_alert=${alertId}`;
+function goToEval(alertId, alertLocId) {
+    if (alertLocId) {
+        localStorage.setItem('agro_loc', alertLocId);
+    }
+    let url = `/analisis?highlight_alert=${alertId}`;
+    if (alertLocId) {
+        url += `&ubicacion_id=${alertLocId}`;
+    }
+    window.location.href = url;
 }
 
-async function resolveAlert(id) {
-    if(!confirm('¿Marcar esta alerta como resuelta? Se notificará por Telegram.')) return;
+async function resolveAlertNow(id) {
+    if(!confirm('¿Marcar esta alerta como resuelta?')) return;
     
     try {
-        const res = await fetch(`/alertas/${id}/quick-resolve`, {
-            method: 'GET',
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-            }
-        });
-        
-        if (res.ok || res.redirected) {
-            window.location.reload();
-        } else {
-            alert('Error al resolver la alerta');
-        }
+        const res = await fetch(`/alertas/${id}/quick-resolve`, { method: 'GET' });
+        if (res.ok || res.redirected) window.location.reload();
+        else alert('Error al resolver la alerta');
     } catch (e) {
         console.error(e);
         alert('Error de conexión');
     }
 }
 
-// Lógica de Configuración
-const locationsData = @json($locations);
+// ═══════════════════════════════════════════════════════════════
+// ⚙️ CONFIGURACIÓN DE ALERTAS
+// ═══════════════════════════════════════════════════════════════
+const locationsData = @json($ubicaciones);
 
 function openConfig() {
     const locId = document.getElementById('f-location').value;
@@ -814,7 +710,7 @@ function openConfig() {
     }
 
     const loc = locationsData.find(l => l.id == locId);
-    const settings = loc.alert_settings || { lixiviacion_alta: true, lixiviacion_media: true, lixiviacion_baja: true };
+    const settings = loc.configuracion_alertas || { lixiviacion_alta: true, lixiviacion_media: true, lixiviacion_baja: true };
 
     body.innerHTML = `
         <div class="config-item">
@@ -878,7 +774,7 @@ async function saveConfig() {
         const json = await res.json();
         if (json.status === 'success') {
             const loc = locationsData.find(l => l.id == locId);
-            if (loc) loc.alert_settings = settings;
+            if (loc) loc.configuracion_alertas = settings;
             alert('Configuración guardada correctamente.');
             closeConfig();
         }
@@ -887,11 +783,8 @@ async function saveConfig() {
     }
 }
 
-['f-location','f-risk','f-status'].forEach(id =>
+['f-risk','f-status'].forEach(id =>
     document.getElementById(id).addEventListener('change', loadAlerts)
 );
-
-loadAlerts();
-setInterval(loadAlerts, 60000);
 </script>
 @endpush

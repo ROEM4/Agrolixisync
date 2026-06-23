@@ -76,12 +76,12 @@
         <div class="flex flex-wrap items-center gap-4 md:gap-8 w-full md:w-auto">
             @if($locations->isNotEmpty())
             <div class="flex-grow md:flex-grow-0">
-                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">📍 Selector de Lote (GE)</label>
-                <select id="location-selector" class="w-full md:min-w-[260px] p-2.5 border-2 border-slate-200 rounded-lg text-sm font-bold text-slate-700 bg-slate-50 focus:border-emerald-500 outline-none transition-colors">
+                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">🔵 Selector de Planta — Grupo Experimental</label>
+                <select id="location-selector" class="w-full md:min-w-[280px] p-2.5 border-2 border-slate-200 rounded-lg text-sm font-bold text-slate-700 bg-slate-50 focus:border-emerald-500 outline-none transition-colors">
                     <option value="">-- Seleccionar Planta GE --</option>
                     @foreach($locations as $loc)
                         <option value="{{ $loc->id }}" {{ request()->query('location_id') == $loc->id ? 'selected' : '' }}>
-                            🌳 Planta #{{ $loc->lote->plant_number ?? '?' }} — {{ $loc->device_code ?? 'Sin código' }}
+                            🌳 {{ $loc->planta->nombre ?? 'Planta' }} (N° {{ $loc->planta->numero_planta ?? '?' }}){{ $loc->codigo_dispositivo ? ' — ' . $loc->codigo_dispositivo : '' }}
                         </option>
                     @endforeach
                 </select>
@@ -174,7 +174,7 @@
                     <div style="font-size:1rem; font-weight:700; color:#a78bfa;">ratio</div>
                 </div>
                 <div style="font-size:0.75rem; color:#64748b; margin-top:0.75rem; font-weight:600; display:flex; justify-content:space-between;">
-                    <span data-tooltip="Equilibrio: 0.90–1.05 | Lixiviación: >1.05 | Acumulación: <0.70">Equilibrio: 0.90–1.05</span>
+                    <span data-tooltip="Alta: ILx > 1.0 | Media: 0.6–1.0 | Baja: ILx < 0.4">Zona normal: 0.4–0.6</span>
                     <span id="status-ilx" style="padding:2px 8px; border-radius:12px; background:#ede9fe; color:#7c3aed; font-weight:700;">--</span>
                 </div>
             </div>
@@ -270,13 +270,11 @@ const buf = { labels: [], sup: [], prof: [], delta: [], ilx: [] };
 
 let prevValues = { ce_s: null, ce_p: null, ilx: null };
 
-// ─── UMBRALES ILx (único criterio de decisión) ─────────────────────────────────
+// ─── UMBRALES ILx (alineados con alertas.blade.php) ──────────────────────────
 const ILX = {
-    LIX_ALTA  : 1.20,
-    LIX       : 1.05,
-    EQUIL_HIGH: 1.05,
-    EQUIL_LOW : 0.90,
-    RET_LOW   : 0.70,
+    ALTA_MIN  : 1.00,  // ILx > 1.0         → Lixiviación Alta
+    MEDIA_MIN : 0.60,  // 0.6 <= ILx <= 1.0 → Lixiviación Media
+    BAJA_MAX  : 0.40,  // ILx < 0.4         → Lixiviación Baja
 };
 
 // Umbrales CE ()
@@ -307,12 +305,11 @@ const THRESHOLDS = {
 
 // ─── CLASIFICACIÓN ILx ────────────────────────────────────────────────────────
 function classifyILx(ilx) {
-    if (isNaN(ilx)) return { estado: 'SIN DATOS', icon: '⚪', level: 'none' };
-    if (ilx > ILX.LIX_ALTA)      return { estado: 'LIXIVIACIÓN ALTA', icon: '🔴', level: 'crit' };
-    if (ilx > ILX.LIX)           return { estado: 'LIXIVIACIÓN',      icon: '🟠', level: 'warn' };
-    if (ilx >= ILX.EQUIL_LOW)    return { estado: 'EQUILIBRIO',       icon: '✅', level: 'ok'   };
-    if (ilx >= ILX.RET_LOW)      return { estado: 'RETENCIÓN',        icon: '🔵', level: 'info' };
-    return                               { estado: 'ACUMULACIÓN',      icon: '🟡', level: 'warn' };
+    if (isNaN(ilx))                return { estado: 'SIN DATOS',        icon: '⚪', level: 'none' };
+    if (ilx > ILX.ALTA_MIN)       return { estado: 'LIXIVIACIÓN ALTA', icon: '🔴', level: 'crit' };
+    if (ilx >= ILX.MEDIA_MIN)     return { estado: 'LIXIVIACIÓN MEDIA',icon: '🟠', level: 'warn' };
+    if (ilx >= ILX.BAJA_MAX)      return { estado: 'EQUILIBRIO',       icon: '✅', level: 'ok'   };
+    return                                { estado: 'LIXIVIACIÓN BAJA', icon: '🟢', level: 'info' };
 }
 
 // ─── CHARTS ───────────────────────────────────────────────────────────────────
@@ -545,8 +542,7 @@ function renderData(sup, prof, pushChart, analysis = null) {
 
     // Badge tarjeta ILx (basado en zona agronómica)
     updateILxCardStyle(ilx);
-
-    // ── BANNER — decisión exclusivamente por ILx ──────────────────────────────
+// ── BANNER — decisión exclusivamente por ILx ──────────────────────────────
     const banner = document.getElementById('status-banner');
     const title  = document.getElementById('status-title');
     const sub    = document.getElementById('status-sub');
@@ -557,7 +553,6 @@ function renderData(sup, prof, pushChart, analysis = null) {
     if (isNaN(ilx)) {
         cls = { estado: 'SISTEMA INCOMPLETO — Esperando sensores', icon: '⚪', level: 'none' };
     } else {
-        // Si el backend ya envía el estado (analysis.state), lo usamos; si no, calculamos
         cls = classifyILx(ilx);
         if (analysis?.ilx_estado) cls.estado = analysis.ilx_estado;
     }
@@ -565,29 +560,45 @@ function renderData(sup, prof, pushChart, analysis = null) {
     const isCritical = cls.level === 'crit';
     const isWarn     = cls.level === 'warn';
 
-    if (isCritical) {
+    // ✅ NUEVO: Si no hay datos nuevos, NO mostrar alerta crítica
+    const isStale = noDataStreak >= STALE_LIMIT;
+
+    if (isCritical && !isStale) {
         banner.style.background = 'var(--scada-crit-bg)';
         banner.style.color      = 'var(--scada-crit-text)';
         banner.style.border     = '2px solid var(--scada-crit-border)';
         toast.style.display     = 'block';
         if (!alertStartTime) alertStartTime = new Date();
-        tTime.textContent = Math.floor((new Date() - alertStartTime) / 60000) + ' min';
-    } else if (isWarn) {
+        const minutes = Math.floor((new Date() - alertStartTime) / 60000);
+        const seconds = Math.floor(((new Date() - alertStartTime) % 60000) / 1000);
+        tTime.textContent = `${minutes}:${seconds.toString().padStart(2, '0')} min`;
+    } else if (isWarn && !isStale) {
         banner.style.background = 'var(--scada-warn-bg)';
         banner.style.color      = 'var(--scada-warn-text)';
         banner.style.border     = '2px solid transparent';
         toast.style.display     = 'none';
-        alertStartTime = null;
+        alertStartTime = null; // ✅ Resetear timer
     } else {
         banner.style.background = 'var(--scada-ok-bg)';
         banner.style.color      = 'var(--scada-ok-text)';
         banner.style.border     = '2px solid transparent';
         toast.style.display     = 'none';
-        alertStartTime = null;
+        alertStartTime = null; // ✅ Resetear timer
+        
+        // ✅ Si está stale, mostrar mensaje especial
+        if (isStale && !isNaN(ilx)) {
+            banner.style.background = '#fef3c7';
+            banner.style.color = '#92400e';
+            title.textContent = '🟡 SIN DATOS NUEVOS';
+            sub.textContent = `Última lectura: ${document.getElementById('last-update').textContent} | Esperando sensores...`;
+        }
     }
 
-    title.textContent = `${cls.icon} ${cls.estado}`;
-    sub.textContent   = `ILx: ${ilxStr}  |  ΔCE: ${isNaN(delta) ? '--' : parseFloat(delta.toPrecision(4))} dS/m`;
+    // ✅ Solo actualizar título si NO está stale
+    if (!isStale) {
+        title.textContent = `${cls.icon} ${cls.estado}`;
+        sub.textContent   = `ILx: ${ilxStr}  |  ΔCE: ${isNaN(delta) ? '--' : parseFloat(delta.toPrecision(4))} dS/m`;
+    }
 
     // ── Actualizar charts ─────────────────────────────────────────────────────
     if (pushChart) {
@@ -693,6 +704,19 @@ function displayRaw(value) {
 // ─── SELECTOR DE LOTE ─────────────────────────────────────────────────────────
 const selector = document.getElementById('location-selector');
 if (selector) {
+    // ✅ FUNCIÓN AUXILIAR: Guardar ubicación en sesión del servidor
+    function syncLocationToServer(locId) {
+        fetch('{{ route("api.set_location") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '{{ csrf_token() }}',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({ location_id: locId })
+        }).catch(err => console.warn('Sync error:', err));
+    }
+
     selector.addEventListener('change', function () {
         stopPoll();
         buf.labels.length = 0; buf.sup.length = 0; buf.prof.length = 0;
@@ -704,10 +728,14 @@ if (selector) {
 
         if (locationId) {
             localStorage.setItem('agro_loc', locationId);
+            // ✅ NUEVO: Sincronizar con el servidor
+            syncLocationToServer(locationId);
             document.getElementById('debug-bar').style.display = 'flex';
             startPoll();
         } else {
             localStorage.removeItem('agro_loc');
+            // ✅ NUEVO: Limpiar del servidor
+            syncLocationToServer(null);
             document.getElementById('debug-bar').style.display = 'none';
             setConn(false, 'Esperando...');
         }
@@ -719,14 +747,30 @@ if (selector) {
         selector.value = requestedLocationId;
         locationId = requestedLocationId;
         localStorage.setItem('agro_loc', requestedLocationId);
+        // ✅ NUEVO: Sincronizar al cargar
+        syncLocationToServer(requestedLocationId);
         document.getElementById('debug-bar').style.display = 'flex';
         startPoll();
     } else if (saved && selector.querySelector(`option[value="${saved}"]`)) {
         selector.value = saved;
         locationId = saved;
+        // ✅ NUEVO: Sincronizar al cargar desde localStorage
+        syncLocationToServer(saved);
         document.getElementById('debug-bar').style.display = 'flex';
         startPoll();
     }
 }
+
+// ─── TIMER DE ALERTA CRÍTICA (actualización cada segundo) ──────────────
+setInterval(() => {
+    const toast = document.getElementById('alert-toast');
+    const tTime = document.getElementById('alert-time');
+    
+    if (toast && toast.style.display === 'block' && alertStartTime && tTime) {
+        const minutes = Math.floor((new Date() - alertStartTime) / 60000);
+        const seconds = Math.floor(((new Date() - alertStartTime) % 60000) / 1000);
+        tTime.textContent = `${minutes}:${seconds.toString().padStart(2, '0')} min`;
+    }
+}, 1000);
 </script>
 @endpush

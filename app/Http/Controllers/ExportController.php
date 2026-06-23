@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Analysis;
-use App\Models\Lote;
-use App\Models\Reading;
+use App\Models\AnalisisLixiviacion;
+use App\Models\Planta;
+use App\Models\Lectura;
 use App\Models\Sensor;
 use App\Services\DataExportService;
 use Illuminate\Http\Request;
@@ -27,16 +27,16 @@ class ExportController extends Controller
     {
         $validated = $request->validate([
             'sensor_ids' => 'required|array',
-            'sensor_ids.*' => 'integer|exists:sensors,id',
+            'sensor_ids.*' => 'integer|exists:sensores,id',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
         ]);
 
         // Verificar permisos - el usuario puede exportar solo sus sensores
         $user = auth()->user();
-        $userSensorIds = Sensor::whereIn('location_id',
-            \DB::table('locations')
-                ->whereIn('lote_id', $user->lotes()->pluck('id'))
+        $userSensorIds = Sensor::whereIn('ubicacion_id',
+            \DB::table('ubicaciones')
+                ->whereIn('planta_id', $user->plantas()->pluck('id'))
                 ->pluck('id')
         )->pluck('id');
 
@@ -66,23 +66,23 @@ class ExportController extends Controller
     public function exportAnalysisCSV(Request $request): Response
     {
         $validated = $request->validate([
-            'lote_id' => 'required|integer|exists:lotes,id',
+            'lote_id' => 'required|integer|exists:plantas,id',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
         ]);
 
         // Verificar permiso
-        $lote = Lote::findOrFail($validated['lote_id']);
-        if ($lote->user_id !== auth()->id()) {
+        $planta = Planta::findOrFail($validated['lote_id']);
+        if ($planta->usuario_id !== auth()->id()) {
             return response('No autorizado', 403);
         }
 
         $startDate = Carbon::parse($validated['start_date']);
         $endDate = Carbon::parse($validated['end_date']);
 
-        $analyses = Analysis::where('lote_id', $lote->id)
-            ->whereBetween('analyzed_at', [$startDate, $endDate])
-            ->with(['lote', 'location', 'sensorSuperficial', 'sensorProfundo'])
+        $analyses = AnalisisLixiviacion::where('planta_id', $planta->id)
+            ->whereBetween('fecha_analisis', [$startDate, $endDate])
+            ->with(['planta', 'ubicacion', 'sensorSuperficial', 'sensorProfundo'])
             ->get();
 
         if ($analyses->isEmpty()) {
@@ -91,7 +91,7 @@ class ExportController extends Controller
 
         $csv = $this->exportService->exportAnalysisToCSV($analyses);
 
-        $filename = 'analisis_' . $lote->name . '_' . now()->format('Y-m-d_His') . '.csv';
+        $filename = 'analisis_' . $planta->nombre . '_' . now()->format('Y-m-d_His') . '.csv';
 
         return response($csv, 200, [
             'Content-Type' => 'text/csv; charset=UTF-8',
@@ -105,23 +105,23 @@ class ExportController extends Controller
     public function generateAnalysisReport(Request $request): Response
     {
         $validated = $request->validate([
-            'lote_id' => 'required|integer|exists:lotes,id',
+            'lote_id' => 'required|integer|exists:plantas,id',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
         ]);
 
         // Verificar permiso
-        $lote = Lote::findOrFail($validated['lote_id']);
-        if ($lote->user_id !== auth()->id()) {
+        $planta = Planta::findOrFail($validated['lote_id']);
+        if ($planta->usuario_id !== auth()->id()) {
             return response('No autorizado', 403);
         }
 
         $startDate = Carbon::parse($validated['start_date']);
         $endDate = Carbon::parse($validated['end_date']);
 
-        $analyses = Analysis::where('lote_id', $lote->id)
-            ->whereBetween('analyzed_at', [$startDate, $endDate])
-            ->with(['lote', 'location', 'sensorSuperficial', 'sensorProfundo', 'alerts'])
+        $analyses = AnalisisLixiviacion::where('planta_id', $planta->id)
+            ->whereBetween('fecha_analisis', [$startDate, $endDate])
+            ->with(['planta', 'ubicacion', 'sensorSuperficial', 'sensorProfundo', 'alertas'])
             ->get();
 
         if ($analyses->isEmpty()) {
@@ -129,12 +129,12 @@ class ExportController extends Controller
         }
 
         $html = $this->exportService->generateAnalysisReport($analyses, [
-            'title' => "Reporte de Lixiviación - {$lote->name}",
+            'title' => "Reporte de Lixiviación - {$planta->nombre}",
             'start_date' => $startDate,
             'end_date' => $endDate,
         ]);
 
-        $filename = 'reporte_' . $lote->name . '_' . now()->format('Y-m-d_His') . '.html';
+        $filename = 'reporte_' . $planta->nombre . '_' . now()->format('Y-m-d_His') . '.html';
 
         return response($html, 200, [
             'Content-Type' => 'text/html; charset=UTF-8',
@@ -143,29 +143,28 @@ class ExportController extends Controller
     }
 
     /**
-     * Descargar reporte como PDF (si tienes DomPDF instalado)
-     * Si no tienes instalada la librería de PDF, puede devolver HTML
+     * Descargar reporte como PDF
      */
     public function generateAnalysisPDF(Request $request)
     {
         $validated = $request->validate([
-            'lote_id' => 'required|integer|exists:lotes,id',
+            'lote_id' => 'required|integer|exists:plantas,id',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
         ]);
 
         // Verificar permiso
-        $lote = Lote::findOrFail($validated['lote_id']);
-        if ($lote->user_id !== auth()->id()) {
+        $planta = Planta::findOrFail($validated['lote_id']);
+        if ($planta->usuario_id !== auth()->id()) {
             return response('No autorizado', 403);
         }
 
         $startDate = Carbon::parse($validated['start_date']);
         $endDate = Carbon::parse($validated['end_date']);
 
-        $analyses = Analysis::where('lote_id', $lote->id)
-            ->whereBetween('analyzed_at', [$startDate, $endDate])
-            ->with(['lote', 'location', 'sensorSuperficial', 'sensorProfundo', 'alerts'])
+        $analyses = AnalisisLixiviacion::where('planta_id', $planta->id)
+            ->whereBetween('fecha_analisis', [$startDate, $endDate])
+            ->with(['planta', 'ubicacion', 'sensorSuperficial', 'sensorProfundo', 'alertas'])
             ->get();
 
         if ($analyses->isEmpty()) {
@@ -173,17 +172,12 @@ class ExportController extends Controller
         }
 
         $html = $this->exportService->generateAnalysisReport($analyses, [
-            'title' => "Reporte de Lixiviación - {$lote->name}",
+            'title' => "Reporte de Lixiviación - {$planta->nombre}",
             'start_date' => $startDate,
             'end_date' => $endDate,
         ]);
 
-        // Si tienes DomPDF instalado, descomenta esto:
-        // $pdf = \PDF::loadHTML($html);
-        // return $pdf->download('reporte_' . $lote->name . '_' . now()->format('Y-m-d_His') . '.pdf');
-
-        // Por ahora, retornar HTML
-        $filename = 'reporte_' . $lote->name . '_' . now()->format('Y-m-d_His') . '.html';
+        $filename = 'reporte_' . $planta->nombre . '_' . now()->format('Y-m-d_His') . '.html';
 
         return response($html, 200, [
             'Content-Type' => 'text/html; charset=UTF-8',
@@ -197,17 +191,17 @@ class ExportController extends Controller
     public function exportSensorComparison(Request $request): Response
     {
         $validated = $request->validate([
-            'sensor1_id' => 'required|integer|exists:sensors,id',
-            'sensor2_id' => 'required|integer|exists:sensors,id',
+            'sensor1_id' => 'required|integer|exists:sensores,id',
+            'sensor2_id' => 'required|integer|exists:sensores,id',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
         ]);
 
         // Verificar permisos
         $user = auth()->user();
-        $userSensorIds = Sensor::whereIn('location_id',
-            \DB::table('locations')
-                ->whereIn('lote_id', $user->lotes()->pluck('id'))
+        $userSensorIds = Sensor::whereIn('ubicacion_id',
+            \DB::table('ubicaciones')
+                ->whereIn('planta_id', $user->plantas()->pluck('id'))
                 ->pluck('id')
         )->pluck('id');
 
@@ -225,7 +219,7 @@ class ExportController extends Controller
 
         $csv = $this->exportService->exportReadingsToCSV($sensors, $startDate, $endDate);
 
-        $filename = 'comparativa_' . $sensor1->code . '_vs_' . $sensor2->code . '_' . now()->format('Y-m-d_His') . '.csv';
+        $filename = 'comparativa_' . $sensor1->codigo . '_vs_' . $sensor2->codigo . '_' . now()->format('Y-m-d_His') . '.csv';
 
         return response($csv, 200, [
             'Content-Type' => 'text/csv; charset=UTF-8',

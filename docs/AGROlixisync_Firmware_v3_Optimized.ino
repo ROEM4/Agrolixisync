@@ -11,9 +11,9 @@
 U8G2_SH1106_128X64_NONAME_F_HW_I2C display(U8G2_R0, U8X8_PIN_NONE);
 
 // ================= WIFI =================
-const char* ssid = "COMPUTRONICA";
+const char* ssid     = "COMPUTRONICA";
 const char* password = "computronic@";
-const char* serverUrl = "http://192.168.1.9:8000/api/sensor/data";
+const char* serverUrl = "http://192.168.1.2:8000/api/sensor/data";  // ← IP del servidor Laravel
 
 // ================= RTC =================
 RTC_DS3231 rtc;
@@ -28,7 +28,10 @@ ModbusMaster node_sup;
 ModbusMaster node_prof;
 
 // ================= IDENTIFICACIÓN =================
-String parcela = "G29";  // ← CAMBIAR según la planta: G1, G2, G3... hasta G30
+// IMPORTANTE: Este valor debe coincidir EXACTAMENTE con el "Device Code"
+// registrado en la planta del Grupo Experimental en AgroLixiSync.
+// Ejemplo: si en el sistema registraste "AGR-001", pon "AGR-001" aquí.
+String parcela = "A16";  // ← CAMBIAR por el Device Code de esta planta en el sistema
 
 // ================= DATA =================
 struct SensorData {

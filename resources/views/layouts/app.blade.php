@@ -181,8 +181,8 @@
 
     {{-- Usuario --}}
     <div class="sidebar-user">
-        <div class="u-name">{{ Auth::user()->name }}</div>
-        <div class="u-role">{{ Auth::user()->role }}</div>
+        <div class="u-name">{{ Auth::user()->nombre }}</div>
+        <div class="u-role">{{ Auth::user()->rol }}</div>
     </div>
 
     {{-- Monitoreo --}}
@@ -223,12 +223,12 @@
     {{-- Gestión --}}
     <div class="nav-divider"></div>
     <div class="nav-section">Gestión</div>
-    <a class="nav-link {{ request()->routeIs('lotes*') ? 'active' : '' }}"
-       href="{{ route('lotes.index') }}">
+    <a class="nav-link {{ request()->routeIs('plantas*') ? 'active' : '' }}"
+       href="{{ route('plantas.index') }}">
         <i class="fas fa-seedling"></i> Plantas
     </a>
 
-    @if(Auth::user()->role === 'admin')
+    @if(Auth::user()->rol === 'admin')
     <a class="nav-link {{ request()->routeIs('usuarios*') ? 'active' : '' }}"
        href="{{ route('usuarios.index') }}">
         <i class="fas fa-users"></i> Usuarios

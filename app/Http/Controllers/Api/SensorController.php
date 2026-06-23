@@ -3,16 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Reading;
-use App\Models\Lote;
+use App\Models\Lectura;
+use App\Models\Planta;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\DB;
 
 class SensorController extends Controller
 {
-
-
     /**
      * Obtener últimos datos para gráficos (AJAX)
      */
@@ -22,7 +19,7 @@ class SensorController extends Controller
             $limit = min($request->input('limit', 30), 100);
             $sensor_id = $request->input('sensor_id');
 
-            $query = Reading::orderBy('recorded_at', 'desc')->limit($limit);
+            $query = Lectura::orderBy('fecha_registro', 'desc')->limit($limit);
             
             if ($sensor_id) {
                 $query->where('sensor_id', $sensor_id);
@@ -41,11 +38,11 @@ class SensorController extends Controller
             }
 
             return response()->json([
-                'labels' => $readings->pluck('recorded_at')->map(fn($date) => $date->format('H:i:s')),
+                'labels' => $readings->pluck('fecha_registro')->map(fn($date) => $date->format('H:i:s')),
                 'sensor_id' => $readings->pluck('sensor_id'),
-                'humedad' => $readings->pluck('humidity')->map(fn($v) => (float)$v),
-                'temperatura' => $readings->pluck('temperature')->map(fn($v) => (float)$v),
-                'ce' => $readings->pluck('conductivity')->map(fn($v) => (float)$v),
+                'humedad' => $readings->pluck('humedad')->map(fn($v) => (float)$v),
+                'temperatura' => $readings->pluck('temperatura')->map(fn($v) => (float)$v),
+                'ce' => $readings->pluck('conductividad')->map(fn($v) => (float)$v),
             ]);
         } catch (\Exception $e) {
             Log::error('Error al obtener datos de gráficos: ' . $e->getMessage());
@@ -61,7 +58,7 @@ class SensorController extends Controller
         try {
             $sensor_id = $request->input('sensor_id');
             
-            $query = Reading::orderBy('recorded_at', 'desc');
+            $query = Lectura::orderBy('fecha_registro', 'desc');
             
             if ($sensor_id) {
                 $query->where('sensor_id', $sensor_id);
@@ -80,4 +77,3 @@ class SensorController extends Controller
         }
     }
 }
-

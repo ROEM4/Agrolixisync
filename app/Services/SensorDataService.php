@@ -2,28 +2,20 @@
 
 namespace App\Services;
 
-use App\Models\Location;
-use App\Models\Reading;
+use App\Models\Ubicacion;
+use App\Models\Lectura;
 use App\Models\Sensor;
-use App\Models\SensorType;
+use App\Models\Planta;
 use Carbon\Carbon;
 
 class SensorDataService
 {
     /**
-     * Crear un nuevo tipo de sensor
-     */
-    public function createSensorType(array $data): SensorType
-    {
-        return SensorType::create($data);
-    }
-
-    /**
      * Crear una nueva ubicación
      */
-    public function createLocation(array $data): Location
+    public function createLocation(array $data): Ubicacion
     {
-        return Location::create($data);
+        return Ubicacion::create($data);
     }
 
     /**
@@ -32,9 +24,9 @@ class SensorDataService
     public function createSensor(array $data): Sensor
     {
         // Validar que no exista otro sensor con el mismo código
-        if (Sensor::where('code', $data['code'])->exists()) {
+        if (Sensor::where('codigo', $data['codigo'])->exists()) {
             throw new \InvalidArgumentException(
-                "Ya existe un sensor con el código: {$data['code']}"
+                "Ya existe un sensor con el código: {$data['codigo']}"
             );
         }
 
@@ -44,19 +36,19 @@ class SensorDataService
     /**
      * Crear lectura de sensor
      */
-    public function recordReading(Sensor $sensor, array $data): Reading
+    public function recordReading(Sensor $sensor, array $data): Lectura
     {
         $data['sensor_id'] = $sensor->id;
 
-        // Si no viene recorded_at, usar ahora
-        if (!isset($data['recorded_at'])) {
-            $data['recorded_at'] = now();
+        // Si no viene fecha_registro, usar ahora
+        if (!isset($data['fecha_registro'])) {
+            $data['fecha_registro'] = now();
         }
 
-        $reading = Reading::create($data);
+        $reading = Lectura::create($data);
 
-        // Actualizar last_reading_at del sensor
-        $sensor->update(['last_reading_at' => $data['recorded_at']]);
+        // Actualizar ultima_lectura del sensor
+        $sensor->update(['ultima_lectura' => $data['fecha_registro']]);
 
         return $reading;
     }
@@ -68,36 +60,35 @@ class SensorDataService
     {
         $startDate = now()->subDays($days);
 
-        $readings = $sensor->readings()
-            ->where('recorded_at', '>=', $startDate)
+        $readings = $sensor->lecturas()
+            ->where('fecha_registro', '>=', $startDate)
             ->get();
 
         if ($readings->isEmpty()) {
             return [
-                'total_readings' => 0,
-                'avg_temperature' => null,
-                'avg_humidity' => null,
-                'avg_conductivity' => null,
-                'min_temperature' => null,
-                'max_temperature' => null,
-                'min_conductivity' => null,
-                'max_conductivity' => null,
+                'total_lecturas'    => 0,
+                'avg_temperatura'   => null,
+                'avg_humedad'       => null,
+                'avg_conductividad' => null,
+                'min_temperatura'   => null,
+                'max_temperatura'   => null,
+                'min_conductividad' => null,
+                'max_conductividad' => null,
             ];
         }
 
         return [
-            'total_readings' => $readings->count(),
-            'avg_temperature' => $readings->avg('temperature'),
-            'avg_humidity' => $readings->avg('humidity'),
-            'avg_conductivity' => $readings->avg('conductivity'),
-            'avg_soil_moisture' => $readings->avg('soil_moisture'),
-            'min_temperature' => $readings->min('temperature'),
-            'max_temperature' => $readings->max('temperature'),
-            'min_humidity' => $readings->min('humidity'),
-            'max_humidity' => $readings->max('humidity'),
-            'min_conductivity' => $readings->min('conductivity'),
-            'max_conductivity' => $readings->max('conductivity'),
-            'last_reading' => $readings->sortByDesc('recorded_at')->first(),
+            'total_lecturas'    => $readings->count(),
+            'avg_temperatura'   => $readings->avg('temperatura'),
+            'avg_humedad'       => $readings->avg('humedad'),
+            'avg_conductividad' => $readings->avg('conductividad'),
+            'min_temperatura'   => $readings->min('temperatura'),
+            'max_temperatura'   => $readings->max('temperatura'),
+            'min_humedad'       => $readings->min('humedad'),
+            'max_humedad'       => $readings->max('humedad'),
+            'min_conductividad' => $readings->min('conductividad'),
+            'max_conductividad' => $readings->max('conductividad'),
+            'ultima_lectura'    => $readings->sortByDesc('fecha_registro')->first(),
         ];
     }
 
@@ -110,57 +101,57 @@ class SensorDataService
         Carbon $startDate,
         Carbon $endDate
     ): array {
-        $readings1 = $sensor1->readings()
-            ->whereBetween('recorded_at', [$startDate, $endDate])
+        $readings1 = $sensor1->lecturas()
+            ->whereBetween('fecha_registro', [$startDate, $endDate])
             ->get();
 
-        $readings2 = $sensor2->readings()
-            ->whereBetween('recorded_at', [$startDate, $endDate])
+        $readings2 = $sensor2->lecturas()
+            ->whereBetween('fecha_registro', [$startDate, $endDate])
             ->get();
 
         return [
             'sensor1' => [
-                'name' => $sensor1->name,
-                'code' => $sensor1->code,
-                'avg_temperature' => $readings1->avg('temperature'),
-                'avg_humidity' => $readings1->avg('humidity'),
-                'avg_conductivity' => $readings1->avg('conductivity'),
-                'total_readings' => $readings1->count(),
+                'nombre'            => $sensor1->nombre,
+                'codigo'            => $sensor1->codigo,
+                'avg_temperatura'   => $readings1->avg('temperatura'),
+                'avg_humedad'       => $readings1->avg('humedad'),
+                'avg_conductividad' => $readings1->avg('conductividad'),
+                'total_lecturas'    => $readings1->count(),
             ],
             'sensor2' => [
-                'name' => $sensor2->name,
-                'code' => $sensor2->code,
-                'avg_temperature' => $readings2->avg('temperature'),
-                'avg_humidity' => $readings2->avg('humidity'),
-                'avg_conductivity' => $readings2->avg('conductivity'),
-                'total_readings' => $readings2->count(),
+                'nombre'            => $sensor2->nombre,
+                'codigo'            => $sensor2->codigo,
+                'avg_temperatura'   => $readings2->avg('temperatura'),
+                'avg_humedad'       => $readings2->avg('humedad'),
+                'avg_conductividad' => $readings2->avg('conductividad'),
+                'total_lecturas'    => $readings2->count(),
             ],
-            'delta_conductivity_avg' => ($readings2->avg('conductivity') ?? 0) - ($readings1->avg('conductivity') ?? 0),
+            'delta_conductividad_avg' => ($readings2->avg('conductividad') ?? 0) - ($readings1->avg('conductividad') ?? 0),
         ];
     }
 
     /**
      * Obtener hilo temporal de lecturas para una ubicación
      */
-    public function getLocationTimeline(Location $location, $days = 7, $limit = 100): array
+    public function getLocationTimeline(Ubicacion $location, $days = 7, $limit = 100): array
     {
         $startDate = now()->subDays($days);
 
-        $sensors = $location->sensors()->get();
+        $sensors = $location->sensores()->get();
         $timeline = [];
 
         foreach ($sensors as $sensor) {
-            $readings = $sensor->readings()
-                ->where('recorded_at', '>=', $startDate)
-                ->latest('recorded_at')
+            $readings = $sensor->lecturas()
+                ->where('fecha_registro', '>=', $startDate)
+                ->latest('fecha_registro')
                 ->limit($limit)
                 ->get();
 
-            $timeline[$sensor->code] = $readings->map(fn($r) => [
-                'timestamp' => $r->recorded_at,
-                'temperature' => $r->temperature,
-                'humidity' => $r->humidity,
-                'conductivity' => $r->conductivity,
+            $timeline[$sensor->codigo] = $readings->map(fn($r) => [
+                'timestamp'     => $r->fecha_registro,
+                'temperatura'   => $r->temperatura,
+                'humedad'       => $r->humedad,
+                'conductividad' => $r->conductividad,
             ])->toArray();
         }
 
@@ -170,32 +161,32 @@ class SensorDataService
     /**
      * Verificar salud de los sensores
      */
-    public function getSensorHealth(Location $location): array
+    public function getSensorHealth(Ubicacion $location): array
     {
-        $sensors = $location->sensors()->get();
+        $sensors = $location->sensores()->get();
         $health = [];
 
         foreach ($sensors as $sensor) {
-            $lastReading = $sensor->lastReading;
+            $lastReading = $sensor->ultimaLectura;
             $isHealthy = true;
             $statusMessage = 'OK';
 
             if (!$lastReading) {
                 $isHealthy = false;
                 $statusMessage = 'Sin lecturas';
-            } elseif ($lastReading->recorded_at->diffInMinutes(now()) > 60) {
+            } elseif ($lastReading->fecha_registro->diffInMinutes(now()) > 60) {
                 $isHealthy = false;
                 $statusMessage = 'Sin datos recientes';
             }
 
             $health[] = [
                 'sensor_id' => $sensor->id,
-                'code' => $sensor->code,
-                'name' => $sensor->name,
+                'code' => $sensor->codigo,
+                'name' => $sensor->nombre,
                 'is_healthy' => $isHealthy,
                 'status' => $statusMessage,
-                'last_reading_at' => $lastReading?->recorded_at,
-                'minutes_since_last' => $lastReading?->recorded_at->diffInMinutes(now()),
+                'last_reading_at' => $lastReading?->fecha_registro,
+                'minutes_since_last' => $lastReading?->fecha_registro ? $lastReading->fecha_registro->diffInMinutes(now()) : null,
             ];
         }
 
@@ -203,16 +194,16 @@ class SensorDataService
     }
 
     /**
-     * Obtener todos los sensores de un lote
+     * Obtener todos los sensores de una planta
      */
-    public function getLoteSensors($lote)
+    public function getPlantaSensors(Planta $planta)
     {
         $sensors = [];
 
-        $locations = $lote->locations;
+        $locations = $planta->ubicaciones;
 
         foreach ($locations as $location) {
-            $sensors = array_merge($sensors, $location->sensors->toArray());
+            $sensors = array_merge($sensors, $location->sensores->toArray());
         }
 
         return $sensors;
@@ -223,7 +214,7 @@ class SensorDataService
      */
     public function updateSensorStatus(Sensor $sensor, string $status): void
     {
-        $sensor->update(['status' => $status]);
+        $sensor->update(['estado' => $status]);
     }
 
     /**
@@ -231,7 +222,7 @@ class SensorDataService
      */
     public function deactivateSensor(Sensor $sensor): void
     {
-        $sensor->update(['is_active' => false, 'status' => 'inactive']);
+        $sensor->update(['activo' => false, 'estado' => 'inactivo']);
     }
 
     /**
@@ -239,7 +230,7 @@ class SensorDataService
      */
     public function activateSensor(Sensor $sensor): void
     {
-        $sensor->update(['is_active' => true, 'status' => 'active']);
+        $sensor->update(['activo' => true, 'estado' => 'activo']);
     }
 
     /**
@@ -249,6 +240,6 @@ class SensorDataService
     {
         $cutoffDate = now()->subDays($days);
 
-        return Reading::where('recorded_at', '<', $cutoffDate)->delete();
+        return Lectura::where('fecha_registro', '<', $cutoffDate)->delete();
     }
 }

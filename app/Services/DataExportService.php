@@ -2,8 +2,9 @@
 
 namespace App\Services;
 
-use App\Models\Reading;
+use App\Models\Lectura;
 use App\Models\Sensor;
+use App\Models\AnalisisLixiviacion;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use League\Csv\Writer;
@@ -35,9 +36,9 @@ class DataExportService
         $sensorIds = array_map(fn($s) => $s->id, $sensors);
 
         // Obtener lecturas
-        $readings = Reading::whereIn('sensor_id', $sensorIds)
-            ->whereBetween('recorded_at', [$startDate, $endDate])
-            ->orderBy('recorded_at')
+        $readings = Lectura::whereIn('sensor_id', $sensorIds)
+            ->whereBetween('fecha_registro', [$startDate, $endDate])
+            ->orderBy('fecha_registro')
             ->get();
 
         // Crear CSV
@@ -58,17 +59,17 @@ class DataExportService
 
         // Insertar datos
         foreach ($readings as $reading) {
-            $ce_us = $reading->conductivity ?? null;
+            $ce_us = $reading->conductividad ?? null;
             $ce_ds = $ce_us !== null ? round($ce_us / 1000, 3) : 'N/A';
 
             $csv->insertOne([
-                $reading->recorded_at->format('Y-m-d'),
-                $reading->recorded_at->format('H:i:s'),
-                $reading->sensor->code,
-                $reading->sensor->name ?? 'N/A',
-                $reading->sensor->depth ?? 'N/A',
-                $reading->temperature ?? 'N/A',
-                $reading->humidity ?? 'N/A',
+                $reading->fecha_registro->format('Y-m-d'),
+                $reading->fecha_registro->format('H:i:s'),
+                $reading->sensor->codigo,
+                $reading->sensor->nombre ?? 'N/A',
+                $reading->sensor->profundidad ?? 'N/A',
+                $reading->temperatura ?? 'N/A',
+                $reading->humedad ?? 'N/A',
                 $ce_us ?? 'N/A',
                 $ce_ds,
             ]);
@@ -102,7 +103,7 @@ class DataExportService
         $csv->insertOne([
             'Fecha',
             'Hora',
-            'Lote',
+            'Planta',
             'Ubicación',
             'Sensor Superficial',
             'Sensor Profundo',
@@ -118,38 +119,38 @@ class DataExportService
 
         // Insertar datos
         foreach ($analyses as $analysis) {
-            $ce_sup  = $analysis->conductivity_superficial !== null
-                ? round($analysis->conductivity_superficial / 1000, 3) : 'N/A';
-            $ce_prof = $analysis->conductivity_profundo !== null
-                ? round($analysis->conductivity_profundo / 1000, 3) : 'N/A';
-            $delta   = $analysis->delta_conductivity !== null
-                ? round($analysis->delta_conductivity / 1000, 3) : 'N/A';
-            $ratio   = ($analysis->conductivity_superficial > 0 && $analysis->conductivity_profundo !== null)
-                ? round($analysis->conductivity_profundo / $analysis->conductivity_superficial, 3) : 'N/A';
-            $threshold = round($analysis->threshold_used / 1000, 3);
+            $ce_sup  = $analysis->conductividad_superficial !== null
+                ? round($analysis->conductividad_superficial / 1000, 3) : 'N/A';
+            $ce_prof = $analysis->conductividad_profundo !== null
+                ? round($analysis->conductividad_profundo / 1000, 3) : 'N/A';
+            $delta   = $analysis->delta_conductividad !== null
+                ? round($analysis->delta_conductividad / 1000, 3) : 'N/A';
+            $ratio   = ($analysis->conductividad_superficial > 0 && $analysis->conductividad_profundo !== null)
+                ? round($analysis->conductividad_profundo / $analysis->conductividad_superficial, 3) : 'N/A';
+            $threshold = round($analysis->umbral_usado / 1000, 3);
 
-            if ($analysis->lixiviation_detected) {
+            if ($analysis->lixiviacion_detectada) {
                 $estado = 'Perdida de fertilizante';
-            } elseif ($analysis->risk_level === 'MEDIO') {
+            } elseif ($analysis->nivel_riesgo === 'MEDIO') {
                 $estado = 'Movimiento de sales';
             } else {
                 $estado = 'Retencion normal';
             }
 
             $csv->insertOne([
-                $analysis->analyzed_at->format('Y-m-d'),
-                $analysis->analyzed_at->format('H:i:s'),
-                $analysis->lote->name,
-                $analysis->location->name,
-                $analysis->sensorSuperficial->code,
-                $analysis->sensorProfundo->code,
+                $analysis->fecha_analisis->format('Y-m-d'),
+                $analysis->fecha_analisis->format('H:i:s'),
+                $analysis->planta->nombre,
+                $analysis->ubicacion->nombre,
+                $analysis->sensorSuperficial->codigo,
+                $analysis->sensorProfundo->codigo,
                 $ce_sup,
                 $ce_prof,
                 $delta,
                 $ratio,
                 $threshold,
-                $analysis->lixiviation_detected ? 'SÍ' : 'NO',
-                ucfirst(strtolower($analysis->risk_level)),
+                $analysis->lixiviacion_detectada ? 'SÍ' : 'NO',
+                ucfirst(strtolower($analysis->nivel_riesgo)),
                 $estado,
             ]);
         }
@@ -164,8 +165,7 @@ class DataExportService
     }
 
     /**
-     * Generar reporte PDF (requiere DomPDF o similar)
-     * Este es un esquema básico - requiere que instales una librería PDF
+     * Generar reporte HTML de análisis
      */
     public function generateAnalysisReport(
         $analyses,
@@ -180,13 +180,11 @@ class DataExportService
             $analyses = [$analyses];
         }
 
-        // Agrupar por lote
-        $byLote = collect($analyses)->groupBy('lote_id');
+        // Agrupar por planta
+        $byLote = collect($analyses)->groupBy('planta_id');
 
-        $htmlContent = $this->buildReportHTML($title, $byLote, $startDate, $endDate);
+        $htmlContent = $this->buildReportHTML($title, $byLote->toArray(), $startDate, $endDate);
 
-        // Si tienes DomPDF instalado, puedes generar PDF
-        // De lo contrario, retornar HTML
         return $htmlContent;
     }
 
@@ -240,17 +238,18 @@ HTML;
 
         $html .= "</div>";
 
-        // Contenido por lote
-        foreach ($byLote as $loteId => $analyses) {
-            $lote = $analyses[0]->lote;
-            $loxivationCount = collect($analyses)->where('lixiviation_detected', true)->count();
-            $avgDelta = collect($analyses)->avg('delta_conductivity');
-            $maxRisk = collect($analyses)->max('risk_percentage');
+        // Contenido por planta
+        foreach ($byLote as $plantaId => $analysesList) {
+            $analyses = collect($analysesList);
+            $planta = $analyses->first()->planta;
+            $loxivationCount = $analyses->where('lixiviacion_detectada', true)->count();
+            $avgDelta = $analyses->avg('delta_conductividad');
+            $maxRisk = $analyses->max('porcentaje_riesgo');
             $loxivationClass = $loxivationCount > 0 ? 'danger' : 'success';
 
             $html .= <<<HTML
             <div class="lote-section">
-                <div class="lote-title">{$lote->name}</div>
+                <div class="lote-title">{$planta->nombre}</div>
                 <div class="summary">
                     <div class="summary-grid">
                         <div class="summary-item">
@@ -275,7 +274,7 @@ HTML;
                             <th>Ubicación</th>
                             <th>Conductividad Superficial</th>
                             <th>Conductividad Profunda</th>
-                            <th>Delta (µS/cm)</th>
+                            <th>Delta (dS/m)</th>
                             <th>Nivel de Riesgo</th>
                             <th>Estado</th>
                         </tr>
@@ -284,18 +283,18 @@ HTML;
 HTML;
 
             foreach ($analyses as $analysis) {
-                $dateTime = $analysis->analyzed_at->format('d/m/Y H:i:s');
-                $location = $analysis->location->name;
-                $condSup = $analysis->conductivity_superficial ?? 'N/A';
-                $condProf = $analysis->conductivity_profundo ?? 'N/A';
-                $delta = $analysis->delta_conductivity;
-                $riskLevel = ucfirst($analysis->risk_level);
-                $status = $analysis->lixiviation_detected ? '<span class="danger">⚠ LIXIVIACIÓN</span>' : '<span class="success">✓ OK</span>';
+                $dateTime = $analysis->fecha_analisis->format('d/m/Y H:i:s');
+                $locationName = $analysis->ubicacion->nombre;
+                $condSup = $analysis->conductividad_superficial ?? 'N/A';
+                $condProf = $analysis->conductividad_profundo ?? 'N/A';
+                $delta = $analysis->delta_conductividad;
+                $riskLevel = ucfirst($analysis->nivel_riesgo);
+                $status = $analysis->lixiviacion_detectada ? '<span class="danger">⚠ LIXIVIACIÓN</span>' : '<span class="success">✓ OK</span>';
 
                 $html .= <<<HTML
                         <tr>
                             <td>{$dateTime}</td>
-                            <td>{$location}</td>
+                            <td>{$locationName}</td>
                             <td>{$condSup}</td>
                             <td>{$condProf}</td>
                             <td>{$delta}</td>

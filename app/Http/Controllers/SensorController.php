@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Location;
+use App\Models\Ubicacion;
 use App\Models\Sensor;
-use App\Models\Reading;
+use App\Models\Lectura;
 use App\Services\SensorDataService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -26,24 +26,24 @@ class SensorController extends Controller
     {
         $user = auth()->user();
 
-        $query = Sensor::whereIn('location_id',
-            Location::whereIn('lote_id', $user->lotes()->pluck('id'))->pluck('id')
+        $query = Sensor::whereIn('ubicacion_id',
+            Ubicacion::whereIn('planta_id', $user->plantas()->pluck('id'))->pluck('id')
         );
 
         // Filtros
-        if ($request->has('is_active')) {
-            $query->where('is_active', $request->boolean('is_active'));
+        if ($request->has('activo')) {
+            $query->where('activo', $request->boolean('activo'));
         }
 
-        if ($request->has('location_id')) {
-            $query->where('location_id', $request->location_id);
+        if ($request->has('ubicacion_id')) {
+            $query->where('ubicacion_id', $request->ubicacion_id);
         }
 
-        if ($request->has('status')) {
-            $query->where('status', $request->status);
+        if ($request->has('estado')) {
+            $query->where('estado', $request->estado);
         }
 
-        $sensors = $query->with(['sensorType', 'location', 'lastReading'])
+        $sensors = $query->with(['ubicacion', 'ultimaLectura'])
             ->paginate($request->get('per_page', 20));
 
         return response()->json([
@@ -58,13 +58,13 @@ class SensorController extends Controller
     public function show(Sensor $sensor): JsonResponse
     {
         // Verificar permiso
-        if ($sensor->location->lote->user_id !== auth()->id()) {
+        if ($sensor->ubicacion->planta->usuario_id !== auth()->id()) {
             return response()->json(['error' => 'No autorizado'], 403);
         }
 
         return response()->json([
             'success' => true,
-            'data' => $sensor->load(['sensorType', 'location', 'lastReading']),
+            'data' => $sensor->load(['ubicacion', 'ultimaLectura']),
         ]);
     }
 
@@ -74,17 +74,16 @@ class SensorController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'code' => 'required|unique:sensors,code',
-            'name' => 'nullable|string',
-            'sensor_type_id' => 'required|exists:sensor_types,id',
-            'location_id' => 'required|exists:locations,id',
-            'depth' => 'required|numeric|min:0',
-            'notes' => 'nullable|string',
+            'codigo' => 'required|unique:sensores,codigo',
+            'nombre' => 'nullable|string',
+            'ubicacion_id' => 'required|exists:ubicaciones,id',
+            'profundidad' => 'required|numeric|min:0',
+            'notas' => 'nullable|string',
         ]);
 
         // Verificar que la ubicación pertenezca al usuario
-        $location = Location::findOrFail($validated['location_id']);
-        if ($location->lote->user_id !== auth()->id()) {
+        $location = Ubicacion::findOrFail($validated['ubicacion_id']);
+        if ($location->planta->usuario_id !== auth()->id()) {
             return response()->json(['error' => 'No autorizado'], 403);
         }
 
@@ -94,7 +93,7 @@ class SensorController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Sensor creado exitosamente',
-                'data' => $sensor->load(['sensorType', 'location']),
+                'data' => $sensor->load(['ubicacion']),
             ], 201);
         } catch (\Exception $e) {
             return response()->json([
@@ -110,13 +109,13 @@ class SensorController extends Controller
     public function update(Request $request, Sensor $sensor): JsonResponse
     {
         // Verificar permiso
-        if ($sensor->location->lote->user_id !== auth()->id()) {
+        if ($sensor->ubicacion->planta->usuario_id !== auth()->id()) {
             return response()->json(['error' => 'No autorizado'], 403);
         }
 
         $validated = $request->validate([
-            'name' => 'nullable|string',
-            'notes' => 'nullable|string',
+            'nombre' => 'nullable|string',
+            'notas' => 'nullable|string',
         ]);
 
         $sensor->update($validated);
@@ -134,16 +133,15 @@ class SensorController extends Controller
     public function recordReading(Request $request, Sensor $sensor): JsonResponse
     {
         // Verificar permiso
-        if ($sensor->location->lote->user_id !== auth()->id()) {
+        if ($sensor->ubicacion->planta->usuario_id !== auth()->id()) {
             return response()->json(['error' => 'No autorizado'], 403);
         }
 
         $validated = $request->validate([
-            'temperature' => 'nullable|numeric',
-            'humidity' => 'nullable|numeric',
-            'conductivity' => 'nullable|numeric',
-            'soil_moisture' => 'nullable|numeric',
-            'recorded_at' => 'nullable|date',
+            'temperatura' => 'nullable|numeric',
+            'humedad' => 'nullable|numeric',
+            'conductividad' => 'nullable|numeric',
+            'fecha_registro' => 'nullable|date',
         ]);
 
         try {
@@ -168,30 +166,30 @@ class SensorController extends Controller
     public function getReadings(Request $request, Sensor $sensor): JsonResponse
     {
         // Verificar permiso
-        if ($sensor->location->lote->user_id !== auth()->id()) {
+        if ($sensor->ubicacion->planta->usuario_id !== auth()->id()) {
             return response()->json(['error' => 'No autorizado'], 403);
         }
 
-        $query = $sensor->readings();
+        $query = $sensor->lecturas();
 
         // Filtros por fecha
         if ($request->has('start_date') && $request->has('end_date')) {
-            $query->whereBetween('recorded_at', [
+            $query->whereBetween('fecha_registro', [
                 Carbon::parse($request->start_date)->startOfDay(),
                 Carbon::parse($request->end_date)->endOfDay(),
             ]);
         }
 
         if ($request->has('minutes')) {
-            $query->recent($request->minutes);
+            $query->where('fecha_registro', '>=', now()->subMinutes($request->integer('minutes')));
         }
 
         $limit = $request->get('limit', 100);
-        $readings = $query->latest('recorded_at')->limit($limit)->get();
+        $readings = $query->latest('fecha_registro')->limit($limit)->get();
 
         return response()->json([
             'success' => true,
-            'sensor' => $sensor->only('id', 'code', 'name'),
+            'sensor' => $sensor->only('id', 'codigo', 'nombre'),
             'readings_count' => $readings->count(),
             'data' => $readings,
         ]);
@@ -203,7 +201,7 @@ class SensorController extends Controller
     public function getStatistics(Request $request, Sensor $sensor): JsonResponse
     {
         // Verificar permiso
-        if ($sensor->location->lote->user_id !== auth()->id()) {
+        if ($sensor->ubicacion->planta->usuario_id !== auth()->id()) {
             return response()->json(['error' => 'No autorizado'], 403);
         }
 
@@ -212,7 +210,7 @@ class SensorController extends Controller
 
         return response()->json([
             'success' => true,
-            'sensor' => $sensor->only('id', 'code', 'name'),
+            'sensor' => $sensor->only('id', 'codigo', 'nombre'),
             'period_days' => $days,
             'statistics' => $statistics,
         ]);
@@ -224,7 +222,7 @@ class SensorController extends Controller
     public function deactivate(Sensor $sensor): JsonResponse
     {
         // Verificar permiso
-        if ($sensor->location->lote->user_id !== auth()->id()) {
+        if ($sensor->ubicacion->planta->usuario_id !== auth()->id()) {
             return response()->json(['error' => 'No autorizado'], 403);
         }
 
@@ -243,7 +241,7 @@ class SensorController extends Controller
     public function activate(Sensor $sensor): JsonResponse
     {
         // Verificar permiso
-        if ($sensor->location->lote->user_id !== auth()->id()) {
+        if ($sensor->ubicacion->planta->usuario_id !== auth()->id()) {
             return response()->json(['error' => 'No autorizado'], 403);
         }
 
@@ -259,10 +257,10 @@ class SensorController extends Controller
     /**
      * Obtener salud de sensores en una ubicación
      */
-    public function getLocationHealth(Location $location): JsonResponse
+    public function getLocationHealth(Ubicacion $location): JsonResponse
     {
         // Verificar permiso
-        if ($location->lote->user_id !== auth()->id()) {
+        if ($location->planta->usuario_id !== auth()->id()) {
             return response()->json(['error' => 'No autorizado'], 403);
         }
 
@@ -270,7 +268,7 @@ class SensorController extends Controller
 
         return response()->json([
             'success' => true,
-            'location' => $location->only('id', 'name'),
+            'location' => $location->only('id', 'nombre'),
             'sensors_health' => $health,
         ]);
     }

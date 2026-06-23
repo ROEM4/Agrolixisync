@@ -97,7 +97,6 @@
 
     .placeholder { padding: 4rem; text-align: center; color: #9ca3af; font-size: 1rem; }
 
-    /* Badges de estado ILx */
     .badge-ilx {
         padding: 4px 12px;
         border-radius: 20px;
@@ -113,7 +112,6 @@
     .badge-ilx-ok   { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
     .badge-ilx-info { background: #e0f2fe; color: #075985; border: 1px solid #bae6fd; }
 
-    /* Navegación académica */
     .academic-nav {
         display: flex;
         gap: 0.75rem;
@@ -155,7 +153,6 @@
         </div>
     </div>
 
-    {{-- Navegación Académica --}}
     <div class="academic-nav">
         <a href="{{ route('dashboard') }}">
             <i class="fas fa-tachometer-alt"></i> Tiempo Real
@@ -167,7 +164,7 @@
             <i class="fas fa-stopwatch"></i> Tiempo de Detección
         </a>
         <a href="{{ route('analisis') }}">
-            <i class="fas fa-graduation-cap"></i> Porcentaje de Precisión de detección
+            <i class="fas fa-graduation-cap"></i> Porcentaje de Precisión
         </a>
         <a href="{{ route('alertas') }}">
             <i class="fas fa-bell"></i> Alertas
@@ -177,20 +174,11 @@
         </a>
     </div>
 
-    {{-- Toolbar --}}
     <div class="toolbar">
         <div>
             <label>🌳 Planta de Palto</label>
             <select id="h-location">
-                <option value="">-- Seleccionar Planta del Grupo Experimental --</option>
-                @foreach($lotesGE as $lote)
-                    @php $loc = $lote->locations->first(); @endphp
-                    @if($loc)
-                        <option value="{{ $loc->id }}" {{ $location_id == $loc->id ? 'selected' : '' }}>
-                            🌳 {{ $lote->name }} (Planta {{ $lote->plant_number }})
-                        </option>
-                    @endif
-                @endforeach
+                <option value="all" selected>🌳 Todas las Plantas (Grupo Experimental)</option>
             </select>
         </div>
         <div>
@@ -205,11 +193,9 @@
             </select>
         </div>
         <button class="btn-load" onclick="loadHistorico()">📊 Cargar datos</button>
-        <button id="export-csv" class="btn-load" style="background:linear-gradient(135deg,#2563eb,#1d4ed8); display:none;" onclick="exportCsv()">📥 Exportar CSV</button>
         <span id="h-status" style="font-size:0.8rem;color:#6b7280;align-self:center;"></span>
     </div>
 
-    {{-- RECENT READINGS TABLE --}}
     <div class="table-card" id="recent-table-section" style="display:none; margin-bottom:1.5rem;">
         <div class="table-head">
             <span>⏱️ Últimas Lecturas Registradas</span>
@@ -237,7 +223,6 @@
 
     <h2 style="font-size:1.2rem; color:#1e293b; font-weight:800; margin-bottom:1rem;">📊 Histórico Diario</h2>
 
-    {{-- Stats --}}
     <div class="stats-grid" id="stats-section" style="display:none;">
         <div class="stat-card" style="border-left:4px solid #7c3aed;">
             <div class="s-label">⚗️ ILx Promedio</div>
@@ -263,7 +248,6 @@
         </div>
     </div>
 
-    {{-- Gráficos --}}
     <div class="charts-grid" id="charts-section" style="display:none;">
         <div class="chart-card">
             <div class="c-title">⚗️ ILx Diario (Indicador Principal)</div>
@@ -283,12 +267,11 @@
         </div>
     </div>
 
-    {{-- Tabla diaria --}}
     <div class="table-card" id="table-section" style="display:none;">
         <div class="table-head">
             <span>Registros Históricos</span>
             <span style="font-size:0.75rem; color:#64748b; font-weight:600;">
-                Umbrales ILx: 🔴 >1.20 | 🟠 >1.05 | ✅ 0.90-1.05 | 🔵 0.70-0.90 | 🟡 <0.70
+                Umbrales ILx: 🔴 >1.0 | 🟠 0.6–1.0 | ✅ 0.4–0.6 | 🟢 <0.4
             </span>
         </div>
         <div style="overflow-x:auto;">
@@ -317,22 +300,6 @@
         </div>
     </div>
 
-    {{-- IMPORTAR CSV --}}
-    <div class="table-card" style="padding:1.25rem; margin-top:1.5rem;">
-        <h3 style="font-size:1rem; color:#1e293b; font-weight:700; margin:0 0 0.5rem 0;">💾 Importar respaldo desde MicroSD</h3>
-        <p style="margin:0 0 1rem; font-size:0.85rem; color:#64748b;">En caso de desconexión WiFi, sube el archivo <code>lecturas.csv</code> para sincronizar.</p>
-        <form id="csv-import-form" style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
-            @csrf
-            <input type="file" id="csv-file" accept=".csv,.txt" required
-                style="padding:0.5rem; border:2px solid #e2e8f0; border-radius:6px; font-size:0.85rem;">
-            <button type="submit"
-                style="padding:0.6rem 1.2rem; background:#10b981; color:white; border:none; border-radius:6px; font-weight:700; cursor:pointer; font-size:0.85rem;">
-                📤 Importar Datos
-            </button>
-            <span id="import-result" style="font-size:0.85rem; font-weight:600;"></span>
-        </form>
-    </div>
-
     <div id="placeholder" class="placeholder">
         <div style="font-size:2.5rem;margin-bottom:0.5rem;">📊</div>
         Selecciona una planta y período para ver el histórico
@@ -349,22 +316,18 @@ function destroyCharts() {
     [chartILx, chartCE, chartHum, chartTemp].forEach(c => c?.destroy());
 }
 
-// Umbrales ILx (consistentes con SCADA)
 const ILX_THRESHOLDS = {
-    LIX_ALTA: 1.20,
-    LIX: 1.05,
-    EQUIL_HIGH: 1.05,
-    EQUIL_LOW: 0.90,
-    RET_LOW: 0.70,
+    ALTA_MIN : 1.00,
+    MEDIA_MIN: 0.60,
+    BAJA_MAX : 0.40,
 };
 
 function classifyILx(ilx) {
     if (isNaN(ilx) || ilx === null) return { estado: 'SIN DATOS', icon: '⚪', level: 'none', class: '' };
-    if (ilx > ILX_THRESHOLDS.LIX_ALTA) return { estado: 'LIXIVIACIÓN ALTA', icon: '🔴', level: 'crit', class: 'badge-ilx-crit' };
-    if (ilx > ILX_THRESHOLDS.LIX) return { estado: 'LIXIVIACIÓN', icon: '🟠', level: 'warn', class: 'badge-ilx-warn' };
-    if (ilx >= ILX_THRESHOLDS.EQUIL_LOW) return { estado: 'EQUILIBRIO', icon: '✅', level: 'ok', class: 'badge-ilx-ok' };
-    if (ilx >= ILX_THRESHOLDS.RET_LOW) return { estado: 'RETENCIÓN', icon: '🔵', level: 'info', class: 'badge-ilx-info' };
-    return { estado: 'ACUMULACIÓN', icon: '🟡', level: 'warn', class: 'badge-ilx-warn' };
+    if (ilx > ILX_THRESHOLDS.ALTA_MIN)   return { estado: 'LIXIVIACIÓN ALTA', icon: '🔴', level: 'crit', class: 'badge-ilx-crit' };
+    if (ilx >= ILX_THRESHOLDS.MEDIA_MIN) return { estado: 'LIXIVIACIÓN MEDIA', icon: '🟠', level: 'warn', class: 'badge-ilx-warn' };
+    if (ilx >= ILX_THRESHOLDS.BAJA_MAX)  return { estado: 'EQUILIBRIO', icon: '✅', level: 'ok', class: 'badge-ilx-ok' };
+    return { estado: 'LIXIVIACIÓN BAJA', icon: '🟢', level: 'info', class: 'badge-ilx-info' };
 }
 
 async function loadHistorico() {
@@ -390,12 +353,13 @@ async function loadHistorico() {
             fetch(`/api/readings/analytics?location_id=${locId}&days=${days}`),
             fetch(`/api/readings/history?location_id=${locId}&limit=50`)
         ]);
+        
         const hist      = await histRes.json();
         const analytics = await analyticsRes.json();
         const recent    = await recentRes.json();
 
-        renderStats(analytics, hist.data ?? []);
-        renderCharts(hist.data ?? [], analytics);
+        renderStats(analytics.data ?? {}, hist.data ?? []);
+        renderCharts(hist.data ?? [], analytics.data ?? {});
         renderTable(hist.data ?? []);
         renderRecent(recent.data ?? []);
 
@@ -403,7 +367,6 @@ async function loadHistorico() {
         document.getElementById('charts-section').style.display = 'grid';
         document.getElementById('table-section').style.display  = 'block';
         document.getElementById('recent-table-section').style.display = 'block';
-        document.getElementById('export-csv').style.display = 'block';
         document.getElementById('h-status').textContent = `✅ ${days} días cargados`;
     } catch(e) {
         document.getElementById('h-status').textContent = '❌ Error al cargar';
@@ -419,11 +382,10 @@ function renderStats(analytics, daily) {
     const prof = analytics.profundo;
     const fmt  = (v, d=4) => v !== null && v !== undefined ? parseFloat(v).toFixed(d) : '--';
 
-    // Calcular ILx promedio del período
     let ilxSum = 0, ilxCount = 0, ilxMin = Infinity, ilxMax = -Infinity;
     daily.forEach(d => {
-        const cs = d.ce_sup_avg ?? d.avg_ce_sup ?? null;
-        const cp = d.ce_prof_avg ?? d.avg_ce_prof ?? null;
+        const cs = d.ce_sup_avg ?? null;
+        const cp = d.ce_prof_avg ?? null;
         if (cs > 0 && cp !== null) {
             const ilx = cp / cs;
             ilxSum += ilx;
@@ -442,7 +404,7 @@ function renderStats(analytics, daily) {
         : '--';
 
     document.getElementById('s-total').textContent   = (sup?.stats?.total_readings ?? 0) + (prof?.stats?.total_readings ?? 0);
-    document.getElementById('s-days-range').textContent = `${analytics.days} días`;
+    document.getElementById('s-days-range').textContent = `${analytics.days ?? 0} días`;
 
     if (sup?.stats) {
         document.getElementById('s-hum-sup').textContent      = fmt(sup.stats.hum_avg, 1);
@@ -456,21 +418,22 @@ function renderCharts(daily, analytics) {
     destroyCharts();
 
     const labels   = daily.map(d => d.day ?? d.date ?? '');
-    const ce_sup   = daily.map(d => d.ce_sup_avg   ?? d.avg_ce_sup   ?? null);
-    const ce_prof  = daily.map(d => d.ce_prof_avg  ?? d.avg_ce_prof  ?? null);
+    const ce_sup   = daily.map(d => d.ce_sup_avg ?? null);
+    const ce_prof  = daily.map(d => d.ce_prof_avg ?? null);
     const ilx      = daily.map(d => {
-        const cs = d.ce_sup_avg ?? d.avg_ce_sup ?? null;
-        const cp = d.ce_prof_avg ?? d.avg_ce_prof ?? null;
+        const cs = d.ce_sup_avg ?? null;
+        const cp = d.ce_prof_avg ?? null;
         return (cs > 0 && cp !== null) ? cp / cs : null;
     });
 
     const supTrend  = analytics.superficial?.daily_trend ?? [];
-    const profTrend = analytics.profundo?.daily_trend    ?? [];
-    const humLabels = supTrend.map(d => d.day);
-    const humSup    = supTrend.map(d => d.hum_avg);
-    const humProf   = profTrend.map(d => d.hum_avg);
-    const tempSup   = supTrend.map(d => d.temp_avg);
-    const tempProf  = profTrend.map(d => d.temp_avg);
+    const profTrend = analytics.profundo?.daily_trend ?? [];
+
+    const humLabels = supTrend.length ? supTrend.map(d => d.day) : labels;
+    const humSup    = supTrend.length ? supTrend.map(d => d.hum_avg) : daily.map(d => d.hum_sup_avg ?? null);
+    const humProf   = profTrend.length ? profTrend.map(d => d.hum_avg) : daily.map(d => d.hum_prof_avg ?? null);
+    const tempSup   = supTrend.length ? supTrend.map(d => d.temp_avg) : daily.map(d => d.temp_sup_avg ?? null);
+    const tempProf  = profTrend.length ? profTrend.map(d => d.temp_avg) : daily.map(d => d.temp_prof_avg ?? null);
 
     const opts = (yLabel) => ({
         responsive: true, maintainAspectRatio: false, animation: false,
@@ -478,7 +441,6 @@ function renderCharts(daily, analytics) {
         scales: { y: { beginAtZero: false, title: { display: true, text: yLabel, font: { size: 10 } } } }
     });
 
-    // Gráfico ILx (PRINCIPAL)
     chartILx = new Chart(document.getElementById('chart-ilx-daily'), {
         type: 'line',
         data: { 
@@ -495,38 +457,14 @@ function renderCharts(daily, analytics) {
                 spanGaps: true
             }]
         },
-        options: {
-            ...opts('ratio'),
-            plugins: {
-                ...opts('ratio').plugins,
-                annotation: {
-                    annotations: {
-                        lixAlta: {
-                            type: 'line', yMin: ILX_THRESHOLDS.LIX_ALTA, yMax: ILX_THRESHOLDS.LIX_ALTA,
-                            borderColor: 'rgba(239,68,68,0.6)', borderWidth: 2, borderDash: [5, 5],
-                            label: { display: true, content: 'Lixiviación Alta (1.20)', backgroundColor: 'rgba(239,68,68,0.8)', position: 'start', font: { weight: 'bold', size: 9 } }
-                        },
-                        lix: {
-                            type: 'line', yMin: ILX_THRESHOLDS.LIX, yMax: ILX_THRESHOLDS.LIX,
-                            borderColor: 'rgba(245,158,11,0.6)', borderWidth: 2, borderDash: [5, 5],
-                            label: { display: true, content: 'Lixiviación (1.05)', backgroundColor: 'rgba(245,158,11,0.8)', position: 'start', font: { weight: 'bold', size: 9 } }
-                        },
-                        equilLow: {
-                            type: 'line', yMin: ILX_THRESHOLDS.EQUIL_LOW, yMax: ILX_THRESHOLDS.EQUIL_LOW,
-                            borderColor: 'rgba(34,197,94,0.6)', borderWidth: 2, borderDash: [5, 5],
-                            label: { display: true, content: 'Equilibrio (0.90)', backgroundColor: 'rgba(34,197,94,0.8)', position: 'start', font: { weight: 'bold', size: 9 } }
-                        }
-                    }
-                }
-            }
-        }
+        options: opts('ratio')
     });
 
     chartCE = new Chart(document.getElementById('chart-ce-daily'), {
         type: 'line',
         data: { labels, datasets: [
-            { label:'SUP 20cm', data: ce_sup,  borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,0.07)', tension:0.3, pointRadius:3, fill:true, borderWidth:2, spanGaps:true },
-            { label:'PROF 60cm', data: ce_prof, borderColor:'#06b6d4', backgroundColor:'rgba(6,182,212,0.07)',  tension:0.3, pointRadius:3, fill:true, borderWidth:2, spanGaps:true },
+            { label:'SUP 20cm', data: ce_sup, borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,0.07)', tension:0.3, pointRadius:3, fill:true, borderWidth:2, spanGaps:true },
+            { label:'PROF 60cm', data: ce_prof, borderColor:'#06b6d4', backgroundColor:'rgba(6,182,212,0.07)', tension:0.3, pointRadius:3, fill:true, borderWidth:2, spanGaps:true },
         ]},
         options: opts('dS/m')
     });
@@ -534,7 +472,7 @@ function renderCharts(daily, analytics) {
     chartHum = new Chart(document.getElementById('chart-hum-daily'), {
         type: 'line',
         data: { labels: humLabels, datasets: [
-            { label:'Hum SUP', data: humSup,  borderColor:'#10b981', backgroundColor:'rgba(16,185,129,0.07)', tension:0.3, pointRadius:3, fill:true, borderWidth:2, spanGaps:true },
+            { label:'Hum SUP', data: humSup, borderColor:'#10b981', backgroundColor:'rgba(16,185,129,0.07)', tension:0.3, pointRadius:3, fill:true, borderWidth:2, spanGaps:true },
             { label:'Hum PROF', data: humProf, borderColor:'#8b5cf6', backgroundColor:'rgba(139,92,246,0.07)', tension:0.3, pointRadius:3, fill:true, borderWidth:2, spanGaps:true },
         ]},
         options: opts('%')
@@ -543,8 +481,8 @@ function renderCharts(daily, analytics) {
     chartTemp = new Chart(document.getElementById('chart-temp-daily'), {
         type: 'line',
         data: { labels: humLabels, datasets: [
-            { label:'Temp SUP', data: tempSup,  borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,0.07)', tension:0.3, pointRadius:3, fill:true, borderWidth:2, spanGaps:true },
-            { label:'Temp PROF', data: tempProf, borderColor:'#ef4444', backgroundColor:'rgba(239,68,68,0.07)',  tension:0.3, pointRadius:3, fill:true, borderWidth:2, spanGaps:true },
+            { label:'Temp SUP', data: tempSup, borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,0.07)', tension:0.3, pointRadius:3, fill:true, borderWidth:2, spanGaps:true },
+            { label:'Temp PROF', data: tempProf, borderColor:'#ef4444', backgroundColor:'rgba(239,68,68,0.07)', tension:0.3, pointRadius:3, fill:true, borderWidth:2, spanGaps:true },
         ]},
         options: opts('°C')
     });
@@ -557,8 +495,8 @@ function renderTable(daily) {
         return;
     }
     body.innerHTML = [...daily].reverse().map(d => {
-        const cs = d.ce_sup_avg  ?? d.avg_ce_sup  ?? null;
-        const cp = d.ce_prof_avg ?? d.avg_ce_prof ?? null;
+        const cs = d.ce_sup_avg ?? null;
+        const cp = d.ce_prof_avg ?? null;
         const ilx = cs > 0 && cp !== null ? (cp / cs) : null;
         const ilxClass = classifyILx(ilx);
         
@@ -572,7 +510,7 @@ function renderTable(daily) {
             </td>
             <td style="color:#10b981;">${d.hum_sup_avg ? parseFloat(d.hum_sup_avg).toFixed(1) + '%' : '--'}</td>
             <td style="color:#f59e0b;">${d.temp_sup_avg ? parseFloat(d.temp_sup_avg).toFixed(1) + '°C' : '--'}</td>
-            <td style="color:#9ca3af; text-align:center;">${d.n ?? d.count ?? '--'}</td>
+            <td style="color:#9ca3af; text-align:center;">${d.n ?? '--'}</td>
         </tr>`;
     }).join('');
 }
@@ -604,7 +542,6 @@ function renderRecent(data) {
             const ce = isSup ? (r.conductivity_raw ?? r.conductivity) : (r.conductivity_raw ?? r.conductivity);
             const numCe = Number(ce);
             
-            // Calcular ILx para esta lectura
             const ceSup = pair.sup ? Number(pair.sup.conductivity_raw ?? pair.sup.conductivity) : null;
             const ceProf = pair.prof ? Number(pair.prof.conductivity_raw ?? pair.prof.conductivity) : null;
             const ilx = (ceSup > 0 && ceProf !== null) ? (ceProf / ceSup) : null;
@@ -630,49 +567,10 @@ function renderRecent(data) {
     body.innerHTML = html;
 }
 
-function exportCsv() {
-    const locId = document.getElementById('h-location').value;
-    if (locId) {
-        window.open(`/api/export/csv?location_id=${locId}`, '_blank');
-    }
-}
-
-document.getElementById('csv-import-form')?.addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const file = document.getElementById('csv-file').files[0];
-    if (!file) return;
-    const result = document.getElementById('import-result');
-    result.textContent = 'Importando...';
-    result.style.color = '#64748b';
-
-    const form = new FormData();
-    form.append('file', file);
-    const token = document.querySelector('input[name="_token"]').value;
-    form.append('_token', token);
-
-    try {
-        const res  = await fetch('/api/import/csv', { method: 'POST', body: form });
-        const json = await res.json();
-        if (json.status === 'success') {
-            result.textContent = `✅ Importados: ${json.imported} | Omitidos: ${json.skipped}`;
-            result.style.color = '#10b981';
-            loadHistorico();
-        } else {
-            result.textContent = '❌ Error: ' + (json.error || 'desconocido');
-            result.style.color = '#ef4444';
-        }
-    } catch(err) {
-        result.textContent = '❌ Error de conexión';
-        result.style.color = '#ef4444';
-    }
-});
-
 // Auto-cargar si hay un lote guardado
 const saved = localStorage.getItem('agro_loc');
 const sel   = document.getElementById('h-location');
-if (sel && sel.value) {
-    loadHistorico();
-} else if (saved && sel && sel.querySelector(`option[value="${saved}"]`)) {
+if (saved && sel && sel.querySelector(`option[value="${saved}"]`)) {
     sel.value = saved;
     loadHistorico();
 }

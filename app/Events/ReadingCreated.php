@@ -2,32 +2,30 @@
 
 namespace App\Events;
 
-use App\Models\Reading;
-use App\Models\Location;
+use App\Models\Lectura;
+use App\Models\Ubicacion;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /**
  * ══════════════════════════════════════════════════════════════
- * EVENT: ReadingCreated
- * 
+ * EVENT: LecturaCreada
+ *
  * Se dispara cuando se reciben 2 nuevas lecturas (SUP + PROF)
- * 
+ *
  * BROADCAST A:
- *   - Canal: locations.{location_id}
- *   - Audiencia: Todos los usuarios viend o ese lote
- * 
+ *   - Canal: ubicaciones.{ubicacion_id}
+ *   - Audiencia: Todos los usuarios viendo esa ubicación
+ *
  * PAYLOAD:
  *   {
- *     "superficial": { reading },
- *     "profundo": { reading },
- *     "location": { location },
- *     "timestamp": "ISO8601"
+ *     "superficial": { lectura },
+ *     "profundo":    { lectura },
+ *     "ubicacion":   { ubicacion },
+ *     "timestamp":   "ISO8601"
  *   }
  * ══════════════════════════════════════════════════════════════
  */
@@ -36,60 +34,58 @@ class ReadingCreated implements ShouldBroadcast
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public function __construct(
-        public Reading $readingSuperficial,
-        public Reading $readingProfundo,
-        public Location $location
+        public Lectura   $lecturaSuperficial,
+        public Lectura   $lecturaProfundo,
+        public Ubicacion $ubicacion
     ) {}
 
     /**
-     * Get the channels the event should broadcast on.
-     *
-     * @return array<int, \Illuminate\Broadcasting\Channel>
+     * Canal de broadcast.
      */
     public function broadcastOn(): array
     {
         return [
-            new Channel('locations.' . $this->location->id),
+            new Channel('ubicaciones.' . $this->ubicacion->id),
         ];
     }
 
     /**
-     * Get the data to broadcast.
+     * Datos que se envían al canal.
      */
     public function broadcastWith(): array
     {
         return [
             'superficial' => [
-                'id' => $this->readingSuperficial->id,
-                'sensor_id' => $this->readingSuperficial->sensor_id,
-                'conductivity' => (float)$this->readingSuperficial->conductivity,
-                'humidity' => (float)$this->readingSuperficial->humidity,
-                'temperature' => (float)$this->readingSuperficial->temperature,
-                'recorded_at' => $this->readingSuperficial->recorded_at->toIso8601String(),
-                'depth' => 0,
+                'id'           => $this->lecturaSuperficial->id,
+                'sensor_id'    => $this->lecturaSuperficial->sensor_id,
+                'conductividad'=> (float) $this->lecturaSuperficial->conductividad,
+                'humedad'      => (float) $this->lecturaSuperficial->humedad,
+                'temperatura'  => (float) $this->lecturaSuperficial->temperatura,
+                'fecha_registro'=> $this->lecturaSuperficial->fecha_registro?->toIso8601String(),
+                'profundidad'  => 20,
             ],
             'profundo' => [
-                'id' => $this->readingProfundo->id,
-                'sensor_id' => $this->readingProfundo->sensor_id,
-                'conductivity' => (float)$this->readingProfundo->conductivity,
-                'humidity' => (float)$this->readingProfundo->humidity,
-                'temperature' => (float)$this->readingProfundo->temperature,
-                'recorded_at' => $this->readingProfundo->recorded_at->toIso8601String(),
-                'depth' => 20,
+                'id'           => $this->lecturaProfundo->id,
+                'sensor_id'    => $this->lecturaProfundo->sensor_id,
+                'conductividad'=> (float) $this->lecturaProfundo->conductividad,
+                'humedad'      => (float) $this->lecturaProfundo->humedad,
+                'temperatura'  => (float) $this->lecturaProfundo->temperatura,
+                'fecha_registro'=> $this->lecturaProfundo->fecha_registro?->toIso8601String(),
+                'profundidad'  => 60,
             ],
-            'location' => [
-                'id' => $this->location->id,
-                'name' => $this->location->name,
+            'ubicacion' => [
+                'id'     => $this->ubicacion->id,
+                'nombre' => $this->ubicacion->nombre,
             ],
             'timestamp' => now()->toIso8601String(),
         ];
     }
 
     /**
-     * Broadcast event name.
+     * Nombre del evento broadcast.
      */
     public function broadcastAs(): string
     {
-        return 'reading-created';
+        return 'lectura-creada';
     }
 }

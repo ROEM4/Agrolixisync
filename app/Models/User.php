@@ -10,16 +10,18 @@ class User extends Authenticatable
 {
     use HasFactory, Notifiable;
 
+    protected $table = 'usuarios';
+
     /**
      * The attributes that are mass assignable.
      *
      * @var array<string>
      */
     protected $fillable = [
-        'name',
+        'nombre',
         'email',
         'password',
-        'role',  // ✅ Solo el nombre del campo
+        'rol',
     ];
 
     /**
@@ -45,44 +47,44 @@ class User extends Authenticatable
         ];
     }
 
-    // Relación con lotes
-    public function lotes()
+    // Relación con plantas
+    public function plantas()
     {
-        return $this->hasMany(Lote::class);
+        return $this->hasMany(Planta::class, 'usuario_id');
     }
 
     /**
-     * Obtener todos los sensores asociados a los lotes del usuario (a través de ubicaciones)
+     * Obtener todos los sensores asociados a las plantas del usuario (a través de ubicaciones)
      */
-    public function sensors()
+    public function sensores()
     {
-        return Sensor::whereIn('location_id',
-            Location::whereIn('lote_id', $this->lotes()->pluck('id'))->pluck('id')
+        return Sensor::whereIn('ubicacion_id',
+            Ubicacion::whereIn('planta_id', $this->plantas()->pluck('id'))->pluck('id')
         );
     }
 
     /**
      * Obtener todas las lecturas asociadas a los sensores del usuario
      */
-    public function readings()
+    public function lecturas()
     {
-        return Reading::whereIn('sensor_id', $this->sensors()->pluck('id'));
+        return Lectura::whereIn('sensor_id', $this->sensores()->pluck('id'));
     }
 
     /**
-     * Obtener todos los análisis del usuario (a través de lotes)
+     * Obtener todos los análisis del usuario (a través de plantas)
      */
-    public function analysis()
+    public function analisis()
     {
-        return Analysis::whereIn('lote_id', $this->lotes()->pluck('id'));
+        return AnalisisLixiviacion::whereIn('planta_id', $this->plantas()->pluck('id'));
     }
 
     /**
      * Obtener todas las alertas del usuario
      */
-    public function alerts()
+    public function alertas()
     {
-        return Alert::whereIn('lote_id', $this->lotes()->pluck('id'));
+        return Alerta::whereIn('planta_id', $this->plantas()->pluck('id'));
     }
 
     /**
@@ -90,7 +92,7 @@ class User extends Authenticatable
      */
     public function getUnresolvedAlerts()
     {
-        return $this->alerts()->unresolved()->orderByDesc('created_at')->get();
+        return $this->alertas()->where('resuelta', false)->orderByDesc('created_at')->get();
     }
 
     /**
@@ -98,7 +100,7 @@ class User extends Authenticatable
      */
     public function isAdmin(): bool
     {
-        return $this->role === 'admin';
+        return $this->rol === 'admin';
     }
 
     /**
@@ -106,6 +108,6 @@ class User extends Authenticatable
      */
     public function isAgricultor(): bool
     {
-        return $this->role === 'agricultor' || $this->role === 'user';
+        return $this->rol === 'agricultor' || $this->rol === 'user';
     }
 }

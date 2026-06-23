@@ -3,20 +3,22 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\PFRecord;
-use App\Models\Location;
+use App\Models\RegistroPorcentajePerdida;
+use App\Models\Ubicacion;
+use App\Models\AnalisisLixiviacion;
+use App\Models\Lectura;
 use Illuminate\Support\Facades\Validator;
 
 class PFRecordController extends Controller
 {
     public function index(Request $request)
     {
-        $location_id = $request->query('location_id');
-        $locations = Location::with('lote')->orderBy('name')->get();
+        $ubicacion_id = $request->query('location_id');
+        $locations = Ubicacion::with('planta')->orderBy('nombre')->get();
 
-        $q = PFRecord::query()->orderByDesc('recorded_at');
-        if ($location_id) {
-            $q->where('location_id', $location_id);
+        $q = RegistroPorcentajePerdida::query()->orderByDesc('fecha_registro');
+        if ($ubicacion_id) {
+            $q->where('ubicacion_id', $ubicacion_id);
         }
         $records = $q->limit(30)->get();
 
@@ -24,35 +26,34 @@ class PFRecordController extends Controller
         $ce_sup = null;
         $ce_prof = null;
         
-        if ($location_id) {
+        if ($ubicacion_id) {
             // Buscamos el último análisis realizado para esta ubicación
-            // Esto sirve tanto para el grupo Experimental (sensores) como Control (manual/simulado)
-            $latestAnalysis = \App\Models\Analysis::where('location_id', $location_id)
-                ->orderByDesc('analyzed_at')
+            $latestAnalysis = AnalisisLixiviacion::where('ubicacion_id', $ubicacion_id)
+                ->orderByDesc('fecha_analisis')
                 ->first();
 
             if ($latestAnalysis) {
-                $ce_sup = $latestAnalysis->conductivity_superficial;
-                $ce_prof = $latestAnalysis->conductivity_profundo;
+                $ce_sup = $latestAnalysis->conductividad_superficial;
+                $ce_prof = $latestAnalysis->conductividad_profundo;
             } else {
                 // Fallback a lecturas directas de sensores si no hay análisis
-                $readings = \App\Models\Reading::whereHas('sensor', function($q) use ($location_id) {
-                    $q->where('location_id', $location_id);
-                })->orderByDesc('recorded_at')->limit(10)->get();
+                $readings = Lectura::whereHas('sensor', function($q) use ($ubicacion_id) {
+                    $q->where('ubicacion_id', $ubicacion_id);
+                })->orderByDesc('fecha_registro')->limit(10)->get();
                 
-                $r_sup = $readings->filter(fn($r) => $r->sensor->depth == 20)->first();
-                $r_prof = $readings->filter(fn($r) => $r->sensor->depth == 60)->first();
+                $r_sup = $readings->filter(fn($r) => $r->sensor->profundidad == 20)->first();
+                $r_prof = $readings->filter(fn($r) => $r->sensor->profundidad == 60)->first();
                 
-                $ce_sup = $r_sup ? $r_sup->conductivity : null;
-                $ce_prof = $r_prof ? $r_prof->conductivity : null;
+                $ce_sup = $r_sup ? $r_sup->conductividad : null;
+                $ce_prof = $r_prof ? $r_prof->conductividad : null;
             }
         }
 
         return view('dashboard.pf_ficha', [
             'locations' => $locations,
-            'location' => $location_id ? Location::find($location_id) : null,
+            'location' => $ubicacion_id ? Ubicacion::find($ubicacion_id) : null,
             'records' => $records,
-            'location_id' => $location_id,
+            'location_id' => $ubicacion_id,
             'ce_sup' => $ce_sup,
             'ce_prof' => $ce_prof
         ]);
@@ -60,10 +61,10 @@ class PFRecordController extends Controller
 
     public function export(Request $request)
     {
-        $location_id = $request->query('location_id');
-        $query = PFRecord::with('location.lote')->orderByDesc('recorded_at');
-        if ($location_id) {
-            $query->where('location_id', $location_id);
+        $ubicacion_id = $request->query('location_id');
+        $query = RegistroPorcentajePerdida::with('ubicacion.planta')->orderByDesc('fecha_registro');
+        if ($ubicacion_id) {
+            $query->where('ubicacion_id', $ubicacion_id);
         }
         $data = $query->get();
 
@@ -91,19 +92,19 @@ class PFRecordController extends Controller
 
             foreach ($data as $r) {
                 // GroupCode: Control = 0, Experimental = 1 (Para ANOVA/T-Test en Jamovi)
-                $groupCode = ($r->experimental_group === 'control') ? 0 : 1;
+                $groupCode = ($r->grupo_experimental === 'control') ? 0 : 1;
 
                 fputcsv($file, [
                     $r->id,
-                    $r->recorded_at->format('Y-m-d H:i:s'),
-                    ($r->location->name ?? 'N/A'),
-                    $r->experimental_group,
+                    $r->fecha_registro->format('Y-m-d H:i:s'),
+                    ($r->ubicacion->nombre ?? 'N/A'),
+                    $r->grupo_experimental,
                     $groupCode,
                     number_format($r->ce_superficial, 3, '.', ''),
                     number_format($r->ce_profunda, 3, '.', ''),
-                    number_format($r->ce_measured, 4, '.', ''), // ILx Experimental
-                    number_format($r->ce_reference, 4, '.', ''), // ILx Control/Ref
-                    number_format($r->pf_percentage, 2, '.', '')
+                    number_format($r->ce_medida, 4, '.', ''), // ILx Experimental
+                    number_format($r->ce_referencia, 4, '.', ''), // ILx Control/Ref
+                    number_format($r->porcentaje_pf, 2, '.', '')
                 ]);
             }
             fclose($file);
@@ -117,7 +118,7 @@ class PFRecordController extends Controller
         $data = $request->all();
 
         $validator = Validator::make($data, [
-            'location_id' => 'nullable|exists:locations,id',
+            'location_id' => 'nullable|exists:ubicaciones,id',
             'recorded_at' => 'required|date',
             'ce_reference' => 'required|numeric', // ILx Control
             'ce_measured' => 'required|numeric',  // ILx Experimental
@@ -132,7 +133,7 @@ class PFRecordController extends Controller
 
         // Enforce max 30 records per location
         if ($data['location_id']) {
-            $count = PFRecord::where('location_id', $data['location_id'])->count();
+            $count = RegistroPorcentajePerdida::where('ubicacion_id', $data['location_id'])->count();
             if ($count >= 30) {
                 return back()->withErrors(['limit' => 'Ya existen 30 registros para esta ubicación.'])->withInput();
             }
@@ -148,19 +149,19 @@ class PFRecordController extends Controller
 
         $location = null;
         if (isset($data['location_id'])) {
-            $location = Location::find($data['location_id']);
+            $location = Ubicacion::find($data['location_id']);
         }
 
-        PFRecord::create([
-            'location_id' => $data['location_id'] ?? null,
-            'experimental_group' => $location ? $location->experimental_group : 'experimental',
-            'recorded_at' => $data['recorded_at'],
+        RegistroPorcentajePerdida::create([
+            'ubicacion_id' => $data['location_id'] ?? null,
+            'grupo_experimental' => $location ? $location->grupo_experimental : 'experimental',
+            'fecha_registro' => $data['recorded_at'],
             'ce_superficial' => $data['ce_superficial'] ?? null,
             'ce_profunda' => $data['ce_profunda'] ?? null,
-            'ce_reference' => $data['ce_reference'],
-            'ce_measured' => $data['ce_measured'],
+            'ce_referencia' => $data['ce_reference'],
+            'ce_medida' => $data['ce_measured'],
             'subparcela' => $data['subparcela'] ?? null,
-            'pf_percentage' => $pf,
+            'porcentaje_pf' => $pf,
         ]);
 
         return redirect()->route('pf.ficha.index', ['location_id' => $data['location_id'] ?? null])->with('success', 'Registro PF guardado');

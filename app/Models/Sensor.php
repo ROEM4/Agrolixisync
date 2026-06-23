@@ -11,94 +11,58 @@ class Sensor extends Model
 {
     use HasFactory;
 
+    protected $table = 'sensores';
+
     protected $fillable = [
-        'code',
-        'name',
-        'location_id',
-        'depth',
-        'is_active',
-        'status',
-        'notes',
-        'last_reading_at',
+        'codigo',
+        'nombre',
+        'ubicacion_id',
+        'profundidad',
+        'tipo_grupo',
+        'activo',
+        'ultima_lectura',
+        'estado',
+        'notas',
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
-        'depth'     => 'decimal:2',
-        'last_reading_at' => 'datetime',
+        'activo' => 'boolean',
+        'profundidad' => 'decimal:2',
+        'ultima_lectura' => 'datetime',
     ];
 
-    /**
-     * Obtener la ubicación del sensor
-     */
-    public function location(): BelongsTo
+    public function ubicacion(): BelongsTo
     {
-        return $this->belongsTo(Location::class);
+        return $this->belongsTo(Ubicacion::class, 'ubicacion_id');
     }
 
-    /**
-     * Obtener todas las lecturas de este sensor
-     */
-    public function readings(): HasMany
+    public function lecturas(): HasMany
     {
-        return $this->hasMany(Reading::class)->orderByDesc('recorded_at');
+        return $this->hasMany(Lectura::class, 'sensor_id')->orderByDesc('fecha_registro');
     }
 
-    /**
-     * Obtener la última lectura
-     */
-    public function lastReading()
+    public function ultimaLectura()
     {
-        return $this->hasOne(Reading::class)->latest('recorded_at');
+        return $this->hasOne(Lectura::class, 'sensor_id')->latest('fecha_registro');
     }
 
-    /**
-     * Obtener análisis donde este sensor es el superficial
-     */
-    public function analysisAsSuperficial(): HasMany
+    public function analisisComoSuperficial(): HasMany
     {
-        return $this->hasMany(Analysis::class, 'sensor_superficial_id');
+        return $this->hasMany(AnalisisLixiviacion::class, 'sensor_superficial_id');
     }
 
-    /**
-     * Obtener análisis donde este sensor es el profundo
-     */
-    public function analysisAsDeep(): HasMany
+    public function analisisComoProfundo(): HasMany
     {
-        return $this->hasMany(Analysis::class, 'sensor_profundo_id');
+        return $this->hasMany(AnalisisLixiviacion::class, 'sensor_profundo_id');
     }
 
-    /**
-     * Determinar si es un sensor superficial
-     */
-    public function isSuperficial(): bool
+    public function esSuperficial(): bool
     {
-        return $this->depth == 0;
+        return $this->profundidad == 20;
     }
 
-    /**
-     * Determinar si es un sensor profundo
-     */
-    public function isDeep(): bool
+    public function esProfundo(): bool
     {
-        return $this->depth > 0;
-    }
-
-    /**
-     * Obtener las últimas N lecturas
-     */
-    public function getLatestReadings($limit = 10)
-    {
-        return $this->readings()->limit($limit)->get();
-    }
-
-    /**
-     * Obtener lecturas en un rango de fechas
-     */
-    public function getReadingsBetween($startDate, $endDate)
-    {
-        return $this->readings()
-            ->whereBetween('recorded_at', [$startDate, $endDate])
-            ->get();
+        return $this->profundidad == 60;
     }
 }

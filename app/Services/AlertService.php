@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\Alert;
+use App\Models\Alerta;
 use Illuminate\Support\Facades\Log;
 
 class AlertService
@@ -14,7 +14,7 @@ class AlertService
     /**
      * Enviar alerta al sistema de notificación
      */
-    public function dispatch(Alert $alert, bool $isUpdate = false): bool
+    public function dispatch(Alerta $alert, bool $isUpdate = false): bool
     {
         try {
             if (!$this->shouldNotify($alert)) {
@@ -35,30 +35,39 @@ class AlertService
     /**
      * Reglas de negocio para decidir si se notifica
      */
-    private function shouldNotify(Alert $alert): bool
+    private function shouldNotify(Alerta $alert): bool
     {
-        // No notificar si ya está resuelta
-        if ($alert->is_resolved) {
+        if ($alert->resuelta) {
             return false;
         }
 
-        // Evitar spam básico (si ya fue enviada recientemente)
         if ($this->wasRecentlySent($alert)) {
             return false;
         }
 
-        $settings = is_array($alert->location->alert_settings ?? null)
-            ? $alert->location->alert_settings
+        $settings = is_array($alert->ubicacion->configuracion_alertas ?? null)
+            ? $alert->ubicacion->configuracion_alertas
             : [];
 
-        $severity = $this->normalizeSeverity($alert->severity ?? $alert->level);
+        // Si no hay configuración guardada, notificar siempre
+        if (empty($settings)) {
+            return true;
+        }
 
-        return match ($severity) {
-            'ALTA' => $settings['lixiviacion_alta'] ?? true,
-            'MEDIA' => $settings['lixiviacion'] ?? true,
-            'BAJA'  => $settings['acumulacion'] ?? true,
-            default => true,
+        // Mapear nivel de alerta a clave de configuración de alertas.blade.php
+        $severity = strtoupper($alert->severidad ?? $alert->nivel ?? '');
+        $key = match ($severity) {
+            'ALTO', 'ALTA'            => 'lixiviacion_alta',
+            'MEDIO', 'MEDIA'          => 'lixiviacion_media',
+            'BAJO', 'BAJA'            => 'lixiviacion_baja',
+            default                   => null,
         };
+
+        if ($key === null) {
+            return true;
+        }
+
+        return $settings[$key] ?? false;
     }
 
     /**
@@ -77,24 +86,30 @@ class AlertService
     /**
      * Evitar spam básico (misma alerta en corto tiempo)
      */
-    private function wasRecentlySent(Alert $alert): bool
+    private function wasRecentlySent(Alerta $alert): bool
     {
+        // Para alertas nuevas (recién creadas) siempre notificar
+        if ($alert->wasRecentlyCreated ?? false) {
+            return false;
+        }
+
+        // Anti-spam: no reenviar si se actualizó hace menos de 5 minutos
         if (!$alert->updated_at) {
             return false;
         }
 
-        return $alert->updated_at->diffInSeconds(now()) < 60;
+        return $alert->updated_at->diffInSeconds(now()) < 300;
     }
 
     /**
      * Construcción del mensaje de Telegram
      */
-    private function buildMessage(Alert $alert, bool $isUpdate): string
+    private function buildMessage(Alerta $alert, bool $isUpdate): string
     {
-        $lote = $alert->location->lote->name ?? 'N/A';
-        $loc  = $alert->location->name ?? 'N/A';
+        $lote = $alert->ubicacion->planta->nombre ?? 'N/A';
+        $loc  = $alert->ubicacion->nombre ?? 'N/A';
 
-        $severity = $this->normalizeSeverity($alert->severity ?? $alert->level);
+        $severity = $this->normalizeSeverity($alert->severidad ?? $alert->nivel);
 
         $emoji = match ($severity) {
             'ALTA' => '🔴',
@@ -111,7 +126,7 @@ class AlertService
 
         return "{$title}\n"
             . "───────────────────\n"
-            . "📍 <b>Lote:</b> {$lote}\n"
+            . "📍 <b>Planta:</b> {$lote}\n"
             . "📍 <b>Ubicación:</b> {$loc}\n"
             . "⚠️ <b>Nivel:</b> <code>{$severity}</code>\n"
             . "───────────────────\n"
@@ -120,14 +135,14 @@ class AlertService
             . "• ΔCE: {$deltaCe} dS/m\n"
             . "───────────────────\n"
             . "📝 <b>Detalle:</b>\n"
-            . "<i>" . ($alert->description ?? 'Detección automática del sistema') . "</i>\n\n"
+            . "<i>" . ($alert->descripcion ?? 'Detección automática del sistema') . "</i>\n\n"
             . "📅 " . now()->format('d/m/Y H:i:s');
     }
 
     /**
      * Botones de acción rápida en Telegram
      */
-    private function buildButtons(Alert $alert): array
+    private function buildButtons(Alerta $alert): array
     {
         $url = rtrim(config('app.url'), '/');
 
