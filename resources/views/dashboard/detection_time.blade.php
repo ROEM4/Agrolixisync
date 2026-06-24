@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Tiempo promedio de Detección — AgroLixiSync')
+@section('title', 'Tiempo Promedio de Detección — AgroLixiSync')
 
 @section('content')
 <style>
@@ -255,7 +255,7 @@
     {{-- Header Section --}}
     <div class="page-header">
         <div>
-            <h1>Tiempo promedio de Detección</h1>
+            <h1>Tiempo Promedio de Detección</h1>
             <p>3er Indicador</p>
         </div>
         <div style="display:flex; gap: 0.75rem;">
@@ -495,160 +495,156 @@
             </div>
         </div>
 
-        {{-- ═══════════════════════════════════════════════════════════════ --}}
-        {{-- 📊 TABLA CON DATOS DE PRECISIÓN Y TIEMPO                      --}}
-        {{-- ═══════════════════════════════════════════════════════════════ --}}
         <div class="table-container">
-        <table class="w-full">
-            <thead>
-                <tr>
-                    <th class="px-6 py-4">#</th>
-                    <th class="px-6 py-4">Fecha</th>
-                    <th class="px-6 py-4">Ti (Inicio)</th>
-                    <th class="px-6 py-4">Tf (Confirmación)</th>
-                    <th class="px-6 py-4 text-center">
-                        <div>N (Precisión)</div>
-                        <div style="font-size: 0.6rem; font-weight: 500; color: #6366f1;">VP + FP</div>
-                    </th>
-                    <th class="px-6 py-4 text-center">
-                        <div>N (Tiempo)</div>
-                        <div style="font-size: 0.6rem; font-weight: 500; color: #8b5cf6;">Solo VP medibles</div>
-                    </th>
-                    <th class="px-6 py-4">Tiempo Promedio</th>
-                    <th class="px-6 py-4">Planta</th>
-                    <th class="px-6 py-4">Tipo Entrada</th>
-                </tr>
-            </thead>
-            <tbody id="detection-body">
-                @if(count($detectionRecords->items()) > 0)
-                    @foreach($detectionRecords->items() as $index => $day)
-                        @php
-                            $dateKey = $day->fecha->format('Y-m-d');
-                            $precisionInfo = $precisionData[$dateKey] ?? null;
-                            
-                            // N Precisión viene de consolidaciones_diarias
-                            $nPrecision = $precisionInfo ? $precisionInfo['n_precision'] : '-';
-                            $vp = $precisionInfo ? $precisionInfo['vp'] : 0;
-                            $fp = $precisionInfo ? $precisionInfo['fp'] : 0;
-                            $pdsPct = $precisionInfo ? $precisionInfo['pds_percentage'] : 0;
-                            
-                            // N Tiempo viene de tiempos_deteccion (cantidad_eventos)
-                            $nTiempo = $day->cantidad_eventos;
-                            
-                            // Calcular Ti y Tf aproximados
-                            $tiHora = $day->fecha->copy()->setHour(8)->format('H:i:s');
-                            $tfHora = $day->fecha->copy()->addSeconds((int)$day->tiempo_promedio_segundos)->format('H:i:s');
-                        @endphp
-                        <tr>
-                            <td>
-                                <div style="font-weight: 700; color: #374151;">
-                                    {{ $detectionRecords->firstItem() + $index }}
-                                </div>
-                            </td>
-                            <td>
-                                <div style="font-weight: 700; color: #1a472a;">
-                                    {{ \Carbon\Carbon::parse($day->fecha)->format('d/m/Y') }}
-                                </div>
-                            </td>
-                            <td>
-                                <div style="font-family: monospace; font-weight: 700; color: #3b82f6;">
-                                    {{ $tiHora }}
-                                </div>
-                                <div style="font-size: 0.65rem; color: #9ca3af;">Ti</div>
-                            </td>
-                            <td>
-                                <div style="font-family: monospace; font-weight: 700; color: #10b981;">
-                                    {{ $tfHora }}
-                                </div>
-                                <div style="font-size: 0.65rem; color: #9ca3af;">Tf</div>
-                            </td>
-                            <td style="text-align: center;">
-                                <div style="font-weight: 900; color: #4f46e5; font-size: 1.25rem; line-height: 1;">
-                                    {{ $nPrecision }}
-                                </div>
-                                <div style="font-size: 0.65rem; color: #64748b; font-weight: 700; margin: 2px 0;">
-                                    (VP:{{ $vp }}+FP:{{ $fp }})
-                                </div>
-                                <div style="font-size: 0.65rem; color: #16a34a; font-weight: 800; background: #dcfce7; padding: 2px 6px; border-radius: 4px; display: inline-block;">
-                                    PDS: {{ number_format($pdsPct, 1) }}%
-                                </div>
-                            </td>
-                            <td style="text-align: center;">
-                                <div style="font-weight: 900; color: #7c3aed; font-size: 1.25rem; line-height: 1;">
-                                    {{ $nTiempo }}
-                                </div>
-                                <div style="font-size: 0.65rem; color: #64748b; font-weight: 700; margin-top: 2px;">
-                                    Eventos medibles
-                                </div>
-                            </td>
-                            <td>
-                                <div style="font-family: monospace; font-weight: 900; color: #059669; font-size: 1.1rem;">
-                                    {{ number_format($day->tiempo_promedio_segundos, 2) }}s
-                                </div>
-                                <div style="font-size: 0.7rem; color: #9ca3af; font-weight: 600;">
-                                    (~{{ round($day->tiempo_promedio_segundos / 60, 2) }} min)
-                                </div>
-                            </td>
-                            <td>
-                                <div style="font-weight: 600; color: #374151; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;">
-                                    <span style="font-size: 1rem;">🌳</span>
-                                    <div>
-                                        <div>{{ $day->ubicacion?->planta?->nombre ?? 'N/D' }}</div>
-                                        @if($day->ubicacion?->planta?->numero_planta)
-                                            <div style="font-size: 0.75rem; color: #9ca3af; font-weight: 600;">
-                                                (N°{{ $day->ubicacion->planta->numero_planta }})
-                                            </div>
-                                        @endif
+            <table class="w-full">
+                <thead>
+                    <tr>
+                        <th class="px-6 py-4">#</th>
+                        <th class="px-6 py-4">Fecha</th>
+                        <th class="px-6 py-4">Ti (Inicio)</th>
+                        <th class="px-6 py-4">Tf (Confirmación)</th>
+                        <th class="px-6 py-4 text-center">
+                            <div>N (Precisión)</div>
+                            <div style="font-size: 0.6rem; font-weight: 500; color: #6366f1;">VP + FP</div>
+                        </th>
+                        <th class="px-6 py-4 text-center">
+                            <div>N (Tiempo)</div>
+                            <div style="font-size: 0.6rem; font-weight: 500; color: #8b5cf6;">Solo VP medibles</div>
+                        </th>
+                        <th class="px-6 py-4">Tiempo Promedio</th>
+                        <th class="px-6 py-4">Planta</th>
+                        <th class="px-6 py-4">Tipo Entrada</th>
+                    </tr>
+                </thead>
+                <tbody id="detection-body">
+                    @if(count($detectionRecords->items()) > 0)
+                        @foreach($detectionRecords->items() as $index => $day)
+                            @php
+                                $dateKey = $day->fecha->format('Y-m-d');
+                                $precisionInfo = $precisionData[$dateKey] ?? null;
+                                
+                                // N Precisión viene de consolidaciones_diarias
+                                $nPrecision = $precisionInfo ? $precisionInfo['n_precision'] : '-';
+                                $vp = $precisionInfo ? $precisionInfo['vp'] : 0;
+                                $fp = $precisionInfo ? $precisionInfo['fp'] : 0;
+                                $pdsPct = $precisionInfo ? $precisionInfo['pds_percentage'] : 0;
+                                
+                                // N Tiempo viene de tiempos_deteccion (cantidad_eventos)
+                                $nTiempo = $day->cantidad_eventos;
+                                
+                                // Calcular Ti y Tf aproximados
+                                $tiHora = $day->tiempo_inicial ? $day->tiempo_inicial->format('H:i:s') : '08:00:00';
+                                $tfHora = $day->tiempo_final ? $day->tiempo_final->format('H:i:s') : '08:00:00';
+                            @endphp
+                            <tr>
+                                <td>
+                                    <div style="font-weight: 700; color: #374151;">
+                                        {{ $detectionRecords->firstItem() + $index }}
                                     </div>
-                                </div>
-                            </td>
-                            <td>
-                                @if($day->tipo_entrada === 'manual')
-                                    <span class="badge bg-amber-100 text-amber-700" style="padding: 4px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: 800;">
-                                        <i class="fas fa-user-edit"></i> Manual
-                                    </span>
-                                @else
-                                    <span class="badge bg-slate-100 text-slate-600" style="padding: 4px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: 800;">
-                                        <i class="fas fa-robot"></i> Automático
-                                    </span>
-                                @endif
+                                </td>
+                                <td>
+                                    <div style="font-weight: 700; color: #1a472a;">
+                                        {{ \Carbon\Carbon::parse($day->fecha)->format('d/m/Y') }}
+                                    </div>
+                                </td>
+                                <td>
+                                    <div style="font-family: monospace; font-weight: 700; color: #3b82f6;">
+                                        {{ $tiHora }}
+                                    </div>
+                                    <div style="font-size: 0.65rem; color: #9ca3af;">Ti</div>
+                                </td>
+                                <td>
+                                    <div style="font-family: monospace; font-weight: 700; color: #10b981;">
+                                        {{ $tfHora }}
+                                    </div>
+                                    <div style="font-size: 0.65rem; color: #9ca3af;">Tf</div>
+                                </td>
+                                <td style="text-align: center;">
+                                    <div style="font-weight: 900; color: #4f46e5; font-size: 1.25rem; line-height: 1;">
+                                        {{ $nPrecision }}
+                                    </div>
+                                    <div style="font-size: 0.65rem; color: #64748b; font-weight: 700; margin: 2px 0;">
+                                        (VP:{{ $vp }}+FP:{{ $fp }})
+                                    </div>
+                                    <div style="font-size: 0.65rem; color: #16a34a; font-weight: 800; background: #dcfce7; padding: 2px 6px; border-radius: 4px; display: inline-block;">
+                                        PDS: {{ number_format($pdsPct, 1) }}%
+                                    </div>
+                                </td>
+                                <td style="text-align: center;">
+                                    <div style="font-weight: 900; color: #7c3aed; font-size: 1.25rem; line-height: 1;">
+                                        {{ $nTiempo }}
+                                    </div>
+                                    <div style="font-size: 0.65rem; color: #64748b; font-weight: 700; margin-top: 2px;">
+                                        Eventos medibles
+                                    </div>
+                                </td>
+                                <td>
+                                    <div style="font-family: monospace; font-weight: 900; color: #059669; font-size: 1.1rem;">
+                                        {{ number_format($day->tiempo_promedio_segundos, 2) }}s
+                                    </div>
+                                    <div style="font-size: 0.7rem; color: #9ca3af; font-weight: 600;">
+                                        (~{{ round($day->tiempo_promedio_segundos / 60, 2) }} min)
+                                    </div>
+                                </td>
+                                <td>
+                                    <div style="font-weight: 600; color: #374151; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;">
+                                        <span style="font-size: 1rem;">🌳</span>
+                                        <div>
+                                            <div>{{ $day->ubicacion?->planta?->nombre ?? 'N/D' }}</div>
+                                            @if($day->ubicacion?->planta?->numero_planta)
+                                                <div style="font-size: 0.75rem; color: #9ca3af; font-weight: 600;">
+                                                    (N°{{ $day->ubicacion->planta->numero_planta }})
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    @if($day->tipo_entrada === 'manual')
+                                        <span class="badge bg-amber-100 text-amber-700" style="padding: 4px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: 800;">
+                                            <i class="fas fa-user-edit"></i> Manual
+                                        </span>
+                                    @else
+                                        <span class="badge bg-slate-100 text-slate-600" style="padding: 4px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: 800;">
+                                            <i class="fas fa-robot"></i> Automático
+                                        </span>
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    @else
+                        <tr>
+                            <td colspan="9" class="empty-state">
+                                <i class="fas fa-inbox"></i>
+                                <p>No se encontraron registros de tiempo de detección con los filtros seleccionados.</p>
                             </td>
                         </tr>
-                    @endforeach
-                @else
-                    <tr>
-                        <td colspan="9" class="empty-state">
-                            <i class="fas fa-inbox"></i>
-                            <p>No se encontraron registros de tiempo de detección con los filtros seleccionados.</p>
-                        </td>
-                    </tr>
-                @endif
-            </tbody>
-        </table>
-    </div>
-
-    {{-- ═══════════════════════════════════════════════════════════════ --}}
-    {{-- 📊 NOTA METODOLÓGICA --}}
-    {{-- ═══════════════════════════════════════════════════════════════ --}}
-    <div style="margin-top: 1.5rem; padding: 1.25rem; background: linear-gradient(135deg, #eff6ff 0%, #eef2ff 100%); border-left: 4px solid #6366f1; border-radius: 12px;">
-        <h4 style="font-weight: 800; color: #4338ca; margin-bottom: 0.5rem; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem;">
-            📊 Nota Metodológica — Diferencia entre N de Precisión y N de Tiempo
-        </h4>
-        <div style="font-size: 0.8rem; color: #475569; line-height: 1.7;">
-            <p style="margin-bottom: 0.5rem;">
-                <strong style="color: #4f46e5;">N (Precisión)</strong> = Total de alertas evaluadas (VP + FP) → Mide cuántas alertas generó el sistema en ese día.
-            </p>
-            <p style="margin-bottom: 0.5rem;">
-                <strong style="color: #7c3aed;">N (Tiempo)</strong> = Solo eventos con medición completa de tiempo (Tf - Ti) → Mide cuántos eventos permitieron calcular el tiempo de detección.
-            </p>
-            <p style="margin: 0; padding: 0.75rem; background: rgba(99, 102, 241, 0.08); border-radius: 8px; border: 1px solid #c7d2fe;">
-                <strong>¿Por qué son diferentes?</strong> Los Falsos Positivos (FP) no tienen tiempo medible porque no hubo evento real de lixiviación. 
-                Algunos Verdaderos Positivos (VP) tampoco tienen tiempo por fallas de sensores o datos incompletos. 
-                Por eso <strong>N(Tiempo) ≤ N(Precisión)</strong>.
-            </p>
+                    @endif
+                </tbody>
+            </table>
         </div>
-    </div>
-</div>
+
+        {{-- ═══════════════════════════════════════════════════════════════ --}}
+        {{-- 📊 NOTA METODOLÓGICA --}}
+        {{-- ═══════════════════════════════════════════════════════════════ --}}
+        <div style="margin-top: 1.5rem; padding: 1.25rem; background: linear-gradient(135deg, #eff6ff 0%, #eef2ff 100%); border-left: 4px solid #6366f1; border-radius: 12px;">
+            <h4 style="font-weight: 800; color: #4338ca; margin-bottom: 0.5rem; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem;">
+                📊 Nota Metodológica — Diferencia entre N de Precisión y N de Tiempo
+            </h4>
+            <div style="font-size: 0.8rem; color: #475569; line-height: 1.7;">
+                <p style="margin-bottom: 0.5rem;">
+                    <strong style="color: #4f46e5;">N (Precisión)</strong> = Total de alertas evaluadas (VP + FP) → Mide cuántas alertas generó el sistema en ese día.
+                </p>
+                <p style="margin-bottom: 0.5rem;">
+                    <strong style="color: #7c3aed;">N (Tiempo)</strong> = Solo eventos con medición completa de tiempo (Tf - Ti) → Mide cuántos eventos permitieron calcular el tiempo de detección.
+                </p>
+                <p style="margin: 0; padding: 0.75rem; background: rgba(99, 102, 241, 0.08); border-radius: 8px; border: 1px solid #c7d2fe;">
+                    <strong>¿Por qué son diferentes?</strong> Los Falsos Positivos (FP) no tienen tiempo medible porque no hubo evento real de lixiviación. 
+                    Algunos Verdaderos Positivos (VP) tampoco tienen tiempo por fallas de sensores o datos incompletos. 
+                    Por eso <strong>N(Tiempo) ≤ N(Precisión)</strong>.
+                </p>
+            </div>
+        </div>
 
 {{-- ═══════════════════════════════════════════════════════════════════ --}}
 {{-- 🆕 MODAL: REGISTRO MANUAL                                         --}}

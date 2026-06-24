@@ -96,6 +96,32 @@ class DetectionTimeController extends Controller
 
         $totalAlertasCount = (clone $recordsQuery)->sum('cantidad_eventos');
         $detectionRecords = $recordsQuery->paginate(15)->withQueryString();
+                // En el método index() de DetectionTimeController.php
+
+        // Después de obtener $detectionRecords, agrega esto:
+        $detectionRecords->getCollection()->transform(function($record) use ($mode) {
+            if ($mode === 'iot') {
+                // Obtener la primera y última alerta del día para esta ubicación
+                $primeraAlerta = \App\Models\Alerta::whereDate('tiempo_alerta', $record->fecha)
+                    ->where('ubicacion_id', $record->ubicacion_id)
+                    ->orderBy('tiempo_alerta', 'asc')
+                    ->first();
+                
+                $ultimaAlerta = \App\Models\Alerta::whereDate('tiempo_alerta', $record->fecha)
+                    ->where('ubicacion_id', $record->ubicacion_id)
+                    ->orderBy('tiempo_alerta', 'desc')
+                    ->first();
+                
+                $record->tiempo_inicial = $primeraAlerta ? $primeraAlerta->tiempo_alerta : null;
+                $record->tiempo_final = $ultimaAlerta ? $ultimaAlerta->tiempo_riesgo : null;
+            } else {
+                // Para modo manual, mantener la lógica actual
+                $record->tiempo_inicial = $record->fecha->copy()->setHour(8);
+                $record->tiempo_final = $record->fecha->copy()->setHour(8)->addSeconds($record->tiempo_promedio_segundos);
+            }
+            
+            return $record;
+        });
 
         // ═══════════════════════════════════════════════════════════════
         // 🆕 OBTENER DATOS DE PRECISIÓN (VP/FP) DESDE ConsolidacionDiaria
