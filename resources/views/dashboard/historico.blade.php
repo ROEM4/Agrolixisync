@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', 'Histórico — AgroLixiSync')
+@section('title', 'Historial de registros — AgroLixiSync')
 
 @section('content')
 <style>
@@ -149,7 +149,7 @@
     <div class="page-header">
         <div>
             <h1>📋 Historial de Registro de Lecturas</h1>
-            <p>Historial reciente y tendencias diarias de CE, humedad, temperatura e ILx</p>
+            <p>Historial reciente y tendencias diarias de CE, humedad, temperatura e NL</p>
         </div>
     </div>
 

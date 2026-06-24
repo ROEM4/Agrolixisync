@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', 'Análisis Académico — AgroLixiSync')
+@section('title', 'Porcentaje de precisión de detección — AgroLixiSync')
 
 @section('content')
 <style>
@@ -516,7 +516,7 @@
                                 <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider text-center">VP</th>
                                 <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider text-center">FP</th>
                                 <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider text-center bg-slate-100/80 font-black">Total Alertas</th>
-                                <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider">PDS %</th>
+                                <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider">PPD %</th>
                                 <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider">Estado</th>
                             </tr>
                         </thead>

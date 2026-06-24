@@ -17,6 +17,9 @@ class LixiviacionController extends Controller
         $filter = $request->query('filter', 'all');
         $mode = $request->query('mode', 'iot');
 
+        // ✅ NUEVO: Detectar si es "all" (todas las plantas)
+        $isAllPlants = ($location_id === 'all');
+
         // 🌳 CARGAR PLANTAS POR GRUPO
         $plantasGC = Planta::where('grupo_experimental', 'control')
             ->with('ubicaciones')
@@ -25,46 +28,60 @@ class LixiviacionController extends Controller
             ->with('ubicaciones')
             ->orderBy('numero_planta')->get();
 
-        $ubicacionSeleccionada = $location_id ? Ubicacion::with('planta')->find($location_id) : null;
-
-        // 🛡️ CORRECCIÓN DE LÓGICA INVERSA
-        if ($mode === 'iot' && $ubicacionSeleccionada && $ubicacionSeleccionada->grupo_experimental === 'control') {
-            $firstGE = $plantasGE->first();
-            $location_id = $firstGE && $firstGE->ubicaciones->isNotEmpty() ? $firstGE->ubicaciones->first()->id : null;
+        // ✅ Si es "all", no cargar ubicación específica
+        if ($isAllPlants) {
+            $ubicacionSeleccionada = null;
+            $isCtrl = ($mode === 'manual');
+        } else {
             $ubicacionSeleccionada = $location_id ? Ubicacion::with('planta')->find($location_id) : null;
-        }
 
-        if ($mode === 'manual' && $ubicacionSeleccionada && $ubicacionSeleccionada->grupo_experimental === 'experimental') {
-            $firstGC = $plantasGC->first();
-            $location_id = $firstGC && $firstGC->ubicaciones->isNotEmpty() ? $firstGC->ubicaciones->first()->id : null;
-            $ubicacionSeleccionada = $location_id ? Ubicacion::with('planta')->find($location_id) : null;
-        }
-
-        if (!$ubicacionSeleccionada) {
-            if ($mode === 'iot') {
+            // 🛡️ CORRECCIÓN DE LÓGICA INVERSA
+            if ($mode === 'iot' && $ubicacionSeleccionada && $ubicacionSeleccionada->grupo_experimental === 'control') {
                 $firstGE = $plantasGE->first();
-                if ($firstGE && $firstGE->ubicaciones->isNotEmpty()) {
-                    $location_id = $firstGE->ubicaciones->first()->id;
-                    $ubicacionSeleccionada = Ubicacion::with('planta')->find($location_id);
-                }
-            } else {
+                $location_id = $firstGE && $firstGE->ubicaciones->isNotEmpty() ? $firstGE->ubicaciones->first()->id : null;
+                $ubicacionSeleccionada = $location_id ? Ubicacion::with('planta')->find($location_id) : null;
+            }
+
+            if ($mode === 'manual' && $ubicacionSeleccionada && $ubicacionSeleccionada->grupo_experimental === 'experimental') {
                 $firstGC = $plantasGC->first();
-                if ($firstGC && $firstGC->ubicaciones->isNotEmpty()) {
-                    $location_id = $firstGC->ubicaciones->first()->id;
-                    $ubicacionSeleccionada = Ubicacion::with('planta')->find($location_id);
+                $location_id = $firstGC && $firstGC->ubicaciones->isNotEmpty() ? $firstGC->ubicaciones->first()->id : null;
+                $ubicacionSeleccionada = $location_id ? Ubicacion::with('planta')->find($location_id) : null;
+            }
+
+            if (!$ubicacionSeleccionada) {
+                if ($mode === 'iot') {
+                    $firstGE = $plantasGE->first();
+                    if ($firstGE && $firstGE->ubicaciones->isNotEmpty()) {
+                        $location_id = $firstGE->ubicaciones->first()->id;
+                        $ubicacionSeleccionada = Ubicacion::with('planta')->find($location_id);
+                    }
+                } else {
+                    $firstGC = $plantasGC->first();
+                    if ($firstGC && $firstGC->ubicaciones->isNotEmpty()) {
+                        $location_id = $firstGC->ubicaciones->first()->id;
+                        $ubicacionSeleccionada = Ubicacion::with('planta')->find($location_id);
+                    }
                 }
             }
-        }
 
-        $isCtrl = $ubicacionSeleccionada && $ubicacionSeleccionada->grupo_experimental === 'control';
+            $isCtrl = $ubicacionSeleccionada && $ubicacionSeleccionada->grupo_experimental === 'control';
+        }
 
         // ✅ Obtener registros (filtrar por grupo según modo)
         $query = AnalisisLixiviacion::with(['planta', 'ubicacion']);
         
-        if ($location_id) {
+        if ($isAllPlants) {
+            // ✅ NUEVO: Si es "all", obtener todas las plantas del grupo
+            if ($mode === 'manual') {
+                $ubicacionIds = $plantasGC->pluck('ubicaciones')->flatten()->pluck('id');
+                $query->whereIn('ubicacion_id', $ubicacionIds);
+            } else {
+                $ubicacionIds = $plantasGE->pluck('ubicaciones')->flatten()->pluck('id');
+                $query->whereIn('ubicacion_id', $ubicacionIds);
+            }
+        } elseif ($location_id) {
             $query->where('ubicacion_id', $location_id);
         } else {
-            // Si no hay ubicación, filtrar por grupo
             if ($mode === 'manual') {
                 $query->where('grupo_experimental', 'control');
             } else {
@@ -84,7 +101,15 @@ class LixiviacionController extends Controller
         // ✅ Datos para gráficos (mismo filtro)
         $chartQuery = AnalisisLixiviacion::query();
         
-        if ($location_id) {
+        if ($isAllPlants) {
+            if ($mode === 'manual') {
+                $ubicacionIds = $plantasGC->pluck('ubicaciones')->flatten()->pluck('id');
+                $chartQuery->whereIn('ubicacion_id', $ubicacionIds);
+            } else {
+                $ubicacionIds = $plantasGE->pluck('ubicaciones')->flatten()->pluck('id');
+                $chartQuery->whereIn('ubicacion_id', $ubicacionIds);
+            }
+        } elseif ($location_id) {
             $chartQuery->where('ubicacion_id', $location_id);
         } else {
             if ($mode === 'manual') {
@@ -116,6 +141,7 @@ class LixiviacionController extends Controller
             'ubicacion' => $ubicacionSeleccionada,
             'ubicacionSeleccionada' => $ubicacionSeleccionada,
             'isCtrl' => $isCtrl,
+            'isAllPlants' => $isAllPlants,
             'mode' => $mode,
             'records' => $records,
             'filter' => $filter,

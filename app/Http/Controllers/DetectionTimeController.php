@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use App\Models\Ubicacion;
 use App\Models\Alerta;
 use App\Models\TiempoDeteccion;
+use App\Models\Planta;
+use App\Models\ConsolidacionDiaria;
 use Carbon\Carbon;
 
 class DetectionTimeController extends Controller
@@ -19,60 +21,71 @@ class DetectionTimeController extends Controller
         $filter = $request->query('filter', 'all');
         $mode = $request->query('mode', 'manual');
 
+        $isAllPlants = ($location_id === 'all');
+
         // 🌳 CARGAR PLANTAS POR GRUPO
-        $plantasGC = \App\Models\Planta::where('grupo_experimental', 'control')
+        $plantasGC = Planta::where('grupo_experimental', 'control')
+            ->with('ubicaciones')
             ->orderBy('numero_planta')->get();
-        $plantasGE = \App\Models\Planta::where('grupo_experimental', 'experimental')
+        $plantasGE = Planta::where('grupo_experimental', 'experimental')
+            ->with('ubicaciones')
             ->orderBy('numero_planta')->get();
 
-        $ubicacionSeleccionada = $location_id ? Ubicacion::find($location_id) : null;
+        if ($isAllPlants) {
+            $ubicacionSeleccionada = null;
+            $isCtrl = ($mode === 'manual');
+        } else {
+            $ubicacionSeleccionada = $location_id ? Ubicacion::with('planta')->find($location_id) : null;
 
-        // 🛡️ CORRECCIÓN DE LÓGICA INVERSA
-        if ($mode === 'iot' && $ubicacionSeleccionada && $ubicacionSeleccionada->grupo_experimental === 'control') {
-            $firstGE = $plantasGE->first();
-            $location_id = $firstGE && $firstGE->ubicaciones->isNotEmpty() ? $firstGE->ubicaciones->first()->id : null;
-            $ubicacionSeleccionada = $location_id ? Ubicacion::find($location_id) : null;
-        }
-
-        if ($mode === 'manual' && $ubicacionSeleccionada && $ubicacionSeleccionada->grupo_experimental === 'experimental') {
-            $firstGC = $plantasGC->first();
-            $location_id = $firstGC && $firstGC->ubicaciones->isNotEmpty() ? $firstGC->ubicaciones->first()->id : null;
-            $ubicacionSeleccionada = $location_id ? Ubicacion::find($location_id) : null;
-        }
-
-        // ✅ SELECCIONAR AUTOMÁTICAMENTE LA PRIMERA PLANTA SI NO HAY NINGUNA
-        if (!$ubicacionSeleccionada) {
-            if ($mode === 'iot') {
+            if ($mode === 'iot' && $ubicacionSeleccionada && $ubicacionSeleccionada->grupo_experimental === 'control') {
                 $firstGE = $plantasGE->first();
-                if ($firstGE && $firstGE->ubicaciones->isNotEmpty()) {
-                    $location_id = $firstGE->ubicaciones->first()->id;
-                    $ubicacionSeleccionada = Ubicacion::find($location_id);
-                }
-            } else {
+                $location_id = $firstGE && $firstGE->ubicaciones->isNotEmpty() ? $firstGE->ubicaciones->first()->id : null;
+                $ubicacionSeleccionada = $location_id ? Ubicacion::with('planta')->find($location_id) : null;
+            }
+
+            if ($mode === 'manual' && $ubicacionSeleccionada && $ubicacionSeleccionada->grupo_experimental === 'experimental') {
                 $firstGC = $plantasGC->first();
-                if ($firstGC && $firstGC->ubicaciones->isNotEmpty()) {
-                    $location_id = $firstGC->ubicaciones->first()->id;
-                    $ubicacionSeleccionada = Ubicacion::find($location_id);
+                $location_id = $firstGC && $firstGC->ubicaciones->isNotEmpty() ? $firstGC->ubicaciones->first()->id : null;
+                $ubicacionSeleccionada = $location_id ? Ubicacion::with('planta')->find($location_id) : null;
+            }
+
+            if (!$ubicacionSeleccionada) {
+                if ($mode === 'iot') {
+                    $firstGE = $plantasGE->first();
+                    if ($firstGE && $firstGE->ubicaciones->isNotEmpty()) {
+                        $location_id = $firstGE->ubicaciones->first()->id;
+                        $ubicacionSeleccionada = Ubicacion::with('planta')->find($location_id);
+                    }
+                } else {
+                    $firstGC = $plantasGC->first();
+                    if ($firstGC && $firstGC->ubicaciones->isNotEmpty()) {
+                        $location_id = $firstGC->ubicaciones->first()->id;
+                        $ubicacionSeleccionada = Ubicacion::with('planta')->find($location_id);
+                    }
                 }
             }
+
+            $isCtrl = $ubicacionSeleccionada && $ubicacionSeleccionada->grupo_experimental === 'control';
         }
 
-        $isCtrl = $ubicacionSeleccionada && $ubicacionSeleccionada->grupo_experimental === 'control';
+        // ═══════════════════════════════════════════════════════════════
+        // 📊 CONSULTAR REGISTROS DE TIEMPO DE DETECCIÓN
+        // ═══════════════════════════════════════════════════════════════
+        $recordsQuery = TiempoDeteccion::with('ubicacion.planta');
 
-        // Sincronizar alertas (solo si hay ubicación seleccionada)
-        if ($ubicacionSeleccionada) {
-            $allAlertas = Alerta::with('ubicacion.planta')
-                ->where('ubicacion_id', $ubicacionSeleccionada->id)
-                ->whereNotNull('tiempo_alerta')
-                ->whereNotNull('tiempo_riesgo')
-                ->get();
-            $this->saveDetectionTimeRecords($allAlertas);
+        if ($isAllPlants) {
+            if ($mode === 'manual') {
+                $ubicacionIds = $plantasGC->pluck('ubicaciones')->flatten()->pluck('id');
+                $recordsQuery->whereIn('ubicacion_id', $ubicacionIds);
+            } else {
+                $ubicacionIds = $plantasGE->pluck('ubicaciones')->flatten()->pluck('id');
+                $recordsQuery->whereIn('ubicacion_id', $ubicacionIds);
+            }
+        } elseif ($location_id) {
+            $recordsQuery->where('ubicacion_id', $location_id);
         }
 
-        // ✅ CONSULTAR REGISTROS - SIEMPRE FILTRAR POR UBICACIÓN
-        $recordsQuery = TiempoDeteccion::with('ubicacion.planta')
-            ->when($location_id, fn($q) => $q->where('ubicacion_id', $location_id))
-            ->orderByDesc('fecha');
+        $recordsQuery->orderByDesc('fecha');
 
         switch ($filter) {
             case '24h': $recordsQuery->where('fecha', '>=', Carbon::today()); break;
@@ -84,17 +97,70 @@ class DetectionTimeController extends Controller
         $totalAlertasCount = (clone $recordsQuery)->sum('cantidad_eventos');
         $detectionRecords = $recordsQuery->paginate(15)->withQueryString();
 
-        // Gráficos - SIEMPRE FILTRAR POR UBICACIÓN
-        $chartQuery = TiempoDeteccion::query()
-            ->when($location_id, fn($q) => $q->where('ubicacion_id', $location_id))
-            ->orderBy('fecha');
-        
+        // ═══════════════════════════════════════════════════════════════
+        // 🆕 OBTENER DATOS DE PRECISIÓN (VP/FP) DESDE ConsolidacionDiaria
+        // ═══════════════════════════════════════════════════════════════
+        $precisionData = [];
+
+        if ($isAllPlants) {
+            $plantaIds = $plantasGE->pluck('id');
+            $consolidaciones = \App\Models\ConsolidacionDiaria::whereIn('planta_id', $plantaIds)->get();
+        } elseif ($ubicacionSeleccionada) {
+            $consolidaciones = \App\Models\ConsolidacionDiaria::where('planta_id', $ubicacionSeleccionada->planta_id)->get();
+        } else {
+            $consolidaciones = collect();
+        }
+
+        foreach ($consolidaciones as $cons) {
+            $dateKey = Carbon::parse($cons->fecha_consolidacion)->format('Y-m-d');
+            
+            if (!isset($precisionData[$dateKey])) {
+                $precisionData[$dateKey] = [
+                    'vp' => 0,
+                    'fp' => 0,
+                    'fn' => 0,
+                    'n_precision' => 0,
+                    'pds_percentage' => 0,
+                ];
+            }
+            
+            $precisionData[$dateKey]['vp'] += $cons->vp ?? 0;
+            $precisionData[$dateKey]['fp'] += $cons->fp ?? 0;
+            $precisionData[$dateKey]['fn'] += $cons->fn ?? 0;
+            $precisionData[$dateKey]['n_precision'] = $precisionData[$dateKey]['vp'] + $precisionData[$dateKey]['fp'] + $precisionData[$dateKey]['fn'];
+            
+            $nTotal = $precisionData[$dateKey]['n_precision'];
+            $precisionData[$dateKey]['pds_percentage'] = $nTotal > 0 
+                ? round(($precisionData[$dateKey]['vp'] / $nTotal) * 100, 1) 
+                : 0;
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // 📈 GRÁFICOS
+        // ═══════════════════════════════════════════════════════════════
+        $chartQuery = TiempoDeteccion::query();
+
+        if ($isAllPlants) {
+            if ($mode === 'manual') {
+                $ubicacionIds = $plantasGC->pluck('ubicaciones')->flatten()->pluck('id');
+                $chartQuery->whereIn('ubicacion_id', $ubicacionIds);
+            } else {
+                $ubicacionIds = $plantasGE->pluck('ubicaciones')->flatten()->pluck('id');
+                $chartQuery->whereIn('ubicacion_id', $ubicacionIds);
+            }
+        } elseif ($location_id) {
+            $chartQuery->where('ubicacion_id', $location_id);
+        }
+
+        $chartQuery->orderBy('fecha');
+
         switch ($filter) {
             case '24h': $chartQuery->where('fecha', '>=', Carbon::today()); break;
             case '7d':  $chartQuery->where('fecha', '>=', Carbon::today()->subDays(7)); break;
             case '14d': $chartQuery->where('fecha', '>=', Carbon::today()->subDays(14)); break;
             case '30d': $chartQuery->where('fecha', '>=', Carbon::today()->subDays(30)); break;
         }
+
         $chartRows = $chartQuery->get();
 
         $dates = $chartRows->map(fn($r) => $r->fecha->format('d/m/Y'))->toArray();
@@ -111,6 +177,7 @@ class DetectionTimeController extends Controller
             'ubicacion' => $ubicacionSeleccionada,
             'ubicacionSeleccionada' => $ubicacionSeleccionada,
             'isCtrl' => $isCtrl,
+            'isAllPlants' => $isAllPlants,
             'mode' => $mode,
             'detectionRecords' => $detectionRecords,
             'filter' => $filter,
@@ -121,6 +188,7 @@ class DetectionTimeController extends Controller
             'eventsJson' => json_encode($events),
             'manualCount' => $manualCount,
             'automaticCount' => $automaticCount,
+            'precisionData' => $precisionData,
         ]);
     }
 
@@ -183,10 +251,32 @@ class DetectionTimeController extends Controller
     {
         $location_id = $request->query('location_id');
         $filter = $request->query('filter', 'all');
+        $mode = $request->query('mode', 'manual');
+        $isAllPlants = ($location_id === 'all');
 
-        $recordsQuery = TiempoDeteccion::with('ubicacion.planta')
-            ->where('ubicacion_id', $location_id)
-            ->orderByDesc('fecha');
+        // 🌳 CARGAR PLANTAS POR GRUPO
+        $plantasGC = Planta::where('grupo_experimental', 'control')
+            ->with('ubicaciones')
+            ->orderBy('numero_planta')->get();
+        $plantasGE = Planta::where('grupo_experimental', 'experimental')
+            ->with('ubicaciones')
+            ->orderBy('numero_planta')->get();
+
+        $recordsQuery = TiempoDeteccion::with('ubicacion.planta');
+
+        if ($isAllPlants) {
+            if ($mode === 'manual') {
+                $ubicacionIds = $plantasGC->pluck('ubicaciones')->flatten()->pluck('id');
+                $recordsQuery->whereIn('ubicacion_id', $ubicacionIds);
+            } else {
+                $ubicacionIds = $plantasGE->pluck('ubicaciones')->flatten()->pluck('id');
+                $recordsQuery->whereIn('ubicacion_id', $ubicacionIds);
+            }
+        } elseif ($location_id) {
+            $recordsQuery->where('ubicacion_id', $location_id);
+        }
+
+        $recordsQuery->orderByDesc('fecha');
 
         switch ($filter) {
             case '24h': $recordsQuery->where('fecha', '>=', Carbon::today()); break;

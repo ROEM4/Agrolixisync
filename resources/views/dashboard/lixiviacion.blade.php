@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', 'Índice de Lixiviación — AgroLixiSync')
+@section('title', 'Nivel de Lixiviación — AgroLixiSync')
 
 @section('content')
 <style>
@@ -199,7 +199,7 @@
                 $defaultManualLoc = $plantasGC->first()?->ubicaciones->first()?->id;
             @endphp
             
-            <a href="{{ route('lixiviacion', ['mode' => 'iot', 'location_id' => ($location_id && !$isCtrl) ? $location_id : $defaultIotLoc, 'filter' => $filter]) }}" 
+            <a href="{{ route('lixiviacion', ['mode' => 'iot', 'location_id' => ($location_id && !$isCtrl && $location_id !== 'all') ? $location_id : $defaultIotLoc, 'filter' => $filter]) }}" 
                class="flex-1 max-w-xs px-6 py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-3 {{ $mode === 'iot' ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-200' : 'bg-white text-slate-600 border-2 border-slate-200 hover:border-emerald-300' }}">
                 <i class="fas fa-robot text-xl"></i>
                 <div class="text-left">
@@ -208,7 +208,7 @@
                 </div>
             </a>
             
-            <a href="{{ route('lixiviacion', ['mode' => 'manual', 'location_id' => ($location_id && $isCtrl) ? $location_id : $defaultManualLoc, 'filter' => $filter]) }}" 
+            <a href="{{ route('lixiviacion', ['mode' => 'manual', 'location_id' => ($location_id && $isCtrl && $location_id !== 'all') ? $location_id : $defaultManualLoc, 'filter' => $filter]) }}" 
                class="flex-1 max-w-xs px-6 py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-3 {{ $mode === 'manual' ? 'bg-amber-600 text-white shadow-xl shadow-amber-200' : 'bg-white text-slate-600 border-2 border-slate-200 hover:border-amber-300' }}">
                 <i class="fas fa-user-edit text-xl"></i>
                 <div class="text-left">
@@ -235,6 +235,10 @@
                     
                     @if($mode === 'iot')
                         <optgroup label="🔵 GRUPO EXPERIMENTAL (IoT)">
+                            {{-- ✅ NUEVA OPCIÓN: TODAS LAS PLANTAS --}}
+                            <option value="all" {{ $location_id === 'all' ? 'selected' : '' }}>
+                                🌳🌳 Todas las Plantas (Consolidado)
+                            </option>
                             @foreach($plantasGE as $planta)
                                 @php $loc = $planta->ubicaciones->first(); @endphp
                                 @if($loc)
@@ -246,6 +250,10 @@
                         </optgroup>
                     @else
                         <optgroup label="🟢 GRUPO CONTROL (Manual)">
+                            {{-- ✅ NUEVA OPCIÓN: TODAS LAS PLANTAS --}}
+                            <option value="all" {{ $location_id === 'all' ? 'selected' : '' }}>
+                                🌳🌳 Todas las Plantas (Consolidado)
+                            </option>
                             @foreach($plantasGC as $planta)
                                 @php $loc = $planta->ubicaciones->first(); @endphp
                                 @if($loc)
@@ -302,6 +310,31 @@
                         <span class="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Sensores Activos</span>
                     </div>
                 @endif
+            </div>
+        </div>
+    @elseif($isAllPlants ?? false)
+        {{-- ✅ NUEVO: PANEL PARA TODAS LAS PLANTAS --}}
+        <div class="mb-8 p-8 rounded-3xl border {{ $mode === 'manual' ? 'border-amber-200/70 bg-gradient-to-br from-amber-50 to-white shadow-md shadow-amber-100/40' : 'border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white shadow-md shadow-emerald-100/40' }}">
+            <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center gap-3">
+                    <span class="p-3 {{ $mode === 'manual' ? 'bg-amber-500' : 'bg-emerald-500' }} text-white rounded-2xl shadow-lg">
+                        <i class="fas fa-layer-group"></i>
+                    </span>
+                    <div>
+                        <h3 class="text-xl font-black {{ $mode === 'manual' ? 'text-amber-800' : 'text-emerald-800' }}">
+                            {{ $mode === 'manual' ? '📝 Modo Manual — ' : '📡 Modo IoT — ' }}🌳🌳 Todas las Plantas
+                        </h3>
+                        <p class="text-sm font-medium {{ $mode === 'manual' ? 'text-amber-600' : 'text-emerald-600' }}">
+                            {{ $mode === 'manual' ? 'Vista consolidada de todas las plantas del Grupo Control' : 'Vista consolidada de todas las plantas del Grupo Experimental' }}
+                        </p>
+                    </div>
+                </div>
+                
+                <span class="px-4 py-2 bg-white rounded-xl border border-{{ $mode === 'manual' ? 'amber' : 'emerald' }}-200 flex items-center gap-2">
+                    <span class="text-[10px] font-black text-{{ $mode === 'manual' ? 'amber' : 'emerald' }}-600 uppercase tracking-widest">
+                        Vista Consolidada
+                    </span>
+                </span>
             </div>
         </div>
     @endif
@@ -370,6 +403,15 @@
             <h2 class="text-2xl font-black text-slate-800 flex items-center gap-3">
                 <span class="p-3 bg-indigo-600 text-white rounded-2xl shadow-lg shadow-indigo-200">📊</span>
                 Tabla de Registro del indicador Nivel de Lixiviación
+                @if($isAllPlants ?? false)
+                    <span class="ml-2 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-black border border-emerald-200">
+                        🌳🌳 Todas las Plantas
+                    </span>
+                @elseif(isset($ubicacionSeleccionada))
+                    <span class="ml-2 px-3 py-1 bg-indigo-100 text-indigo-700 rounded-lg text-xs font-black border border-indigo-200">
+                        🌳 {{ $ubicacionSeleccionada->planta->nombre ?? 'N/D' }} N°{{ $ubicacionSeleccionada->planta->numero_planta ?? '?' }}
+                    </span>
+                @endif
             </h2>
             
             {{-- Filtros de tiempo --}}
@@ -413,12 +455,10 @@
                                 <td class="px-6 py-4 font-mono text-emerald-600">
                                     {{ number_format($record->conductividad_profundo, 3) }}
                                 </td>
-                                {{-- ✅ AHORA (correcto) --}}
                                 <td class="px-6 py-4">
                                     @php
                                         $ilxValue = (float) ($record->ilx ?? 0);
                                         
-                                        // Clasificación consistente con el modal
                                         if ($ilxValue > 1.0) {
                                             $nivelTexto = 'ALTA LIXIVIACIÓN';
                                             $badgeClass = 'bg-red-100 text-red-700 border border-red-200';
@@ -432,7 +472,6 @@
                                     @endphp
                                     <span class="status-badge {{ $badgeClass }}">{{ $nivelTexto }}</span>
                                 </td>
-
                                 <td class="px-6 py-4 font-mono font-black text-indigo-600">
                                     {{ number_format($record->ilx ?? 0, 3) }}
                                 </td>
@@ -553,7 +592,7 @@ function classifyILx(ilx) {
 }
 
 async function poll() {
-    if (!locationId || isCtrl) return;
+    if (!locationId || isCtrl || locationId === 'all') return;
     try {
         const res  = await fetch(`/api/readings/latest?location_id=${locationId}&_=${Date.now()}`);
         const json = await res.json();
@@ -631,7 +670,6 @@ function updateModalILx() {
     
     document.getElementById('modal-ilx-preview').textContent = isNaN(ilx) ? '--' : ilx.toFixed(3);
     
-    // ✅ Clasificación consistente
     let estado, badgeClass;
     if (isNaN(ilx)) {
         estado = 'SIN DATOS';
@@ -654,8 +692,8 @@ function updateModalILx() {
 
 // Inicialización
 if (locationId) {
-    if (isCtrl) {
-        setConn('🟡 Modo Manual');
+    if (isCtrl || locationId === 'all') {
+        setConn(locationId === 'all' ? '📊 Vista Consolidada' : '🟡 Modo Manual');
     } else {
         poll();
         pollTimer = setInterval(poll, 3000);

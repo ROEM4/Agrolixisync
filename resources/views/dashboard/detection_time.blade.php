@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Tiempo de Detección — AgroLixiSync')
+@section('title', 'Tiempo promedio de Detección — AgroLixiSync')
 
 @section('content')
 <style>
@@ -259,7 +259,7 @@
             <p>3er Indicador</p>
         </div>
         <div style="display:flex; gap: 0.75rem;">
-            <a href="{{ route('detection_time.export', ['location_id' => $location_id, 'filter' => $filter]) }}" class="btn btn-light shadow-sm" style="border-radius:10px; font-weight:600; font-size:0.85rem; text-decoration: none; display: flex; align-items: center; justify-content: center; padding: 0.5rem 1rem;">
+            <a href="{{ route('detection_time.export', ['location_id' => $location_id, 'mode' => $mode, 'filter' => $filter]) }}" class="btn btn-light shadow-sm" style="border-radius:10px; font-weight:600; font-size:0.85rem; text-decoration: none; display: flex; align-items: center; justify-content: center; padding: 0.5rem 1rem;">
                 <i class="fas fa-download"></i> Descargar
             </a>
         </div>
@@ -289,7 +289,7 @@
                 $defaultManualLoc = $plantasGC->first()?->ubicaciones->first()?->id;
             @endphp
             
-            <a href="{{ route('detection_time', ['mode' => 'iot', 'location_id' => ($location_id && !$isCtrl) ? $location_id : $defaultIotLoc, 'filter' => $filter]) }}" 
+            <a href="{{ route('detection_time', ['mode' => 'iot', 'location_id' => ($location_id === 'all' ? 'all' : (($location_id && !$isCtrl) ? $location_id : $defaultIotLoc)), 'filter' => $filter]) }}" 
                class="flex-1 max-w-xs px-6 py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-3 {{ $mode === 'iot' ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-200' : 'bg-white text-slate-600 border-2 border-slate-200 hover:border-emerald-300' }}">
                 <i class="fas fa-robot text-xl"></i>
                 <div class="text-left">
@@ -298,7 +298,7 @@
                 </div>
             </a>
             
-            <a href="{{ route('detection_time', ['mode' => 'manual', 'location_id' => ($location_id && $isCtrl) ? $location_id : $defaultManualLoc, 'filter' => $filter]) }}" 
+            <a href="{{ route('detection_time', ['mode' => 'manual', 'location_id' => ($location_id === 'all' ? 'all' : (($location_id && $isCtrl) ? $location_id : $defaultManualLoc)), 'filter' => $filter]) }}" 
                class="flex-1 max-w-xs px-6 py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-3 {{ $mode === 'manual' ? 'bg-amber-600 text-white shadow-xl shadow-amber-200' : 'bg-white text-slate-600 border-2 border-slate-200 hover:border-amber-300' }}">
                 <i class="fas fa-user-edit text-xl"></i>
                 <div class="text-left">
@@ -320,11 +320,15 @@
                 <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">
                     🌳 Seleccionar Planta de Palto — {{ $mode === 'iot' ? 'Grupo Experimental' : 'Grupo Control' }}
                 </label>
-                <select name="location_id" id="location-selector" onchange="this.form.submit()" 
+                <select name="location_id" id="location-selector" 
                         class="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-{{ $mode === 'iot' ? 'emerald' : 'amber' }}-500 transition-all shadow-sm">
                     
                     @if($mode === 'iot')
-                        <optgroup label="🔵 GRUPO EXPERIMENTAL (IoT)">
+                        <optgroup label=" GRUPO EXPERIMENTAL (IoT)">
+                            {{-- ✅ NUEVA OPCIÓN: TODAS LAS PLANTAS --}}
+                            <option value="all" {{ $location_id === 'all' ? 'selected' : '' }}>
+                                🌳 Todas las Plantas (Consolidado)
+                            </option>
                             @foreach($plantasGE as $planta)
                                 @php $loc = $planta->ubicaciones->first(); @endphp
                                 @if($loc)
@@ -336,6 +340,10 @@
                         </optgroup>
                     @else
                         <optgroup label="🟢 GRUPO CONTROL (Manual)">
+                            {{-- ✅ NUEVA OPCIÓN: TODAS LAS PLANTAS --}}
+                            <option value="all" {{ $location_id === 'all' ? 'selected' : '' }}>
+                                🌳 Todas las Plantas (Consolidado)
+                            </option>
                             @foreach($plantasGC as $planta)
                                 @php $loc = $planta->ubicaciones->first(); @endphp
                                 @if($loc)
@@ -381,6 +389,31 @@
                         <span class="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Cálculo Automático</span>
                     </div>
                 @endif
+            </div>
+        </div>
+    @elseif($isAllPlants ?? false)
+        {{-- ✅ NUEVO: PANEL PARA TODAS LAS PLANTAS --}}
+        <div class="mb-8 p-8 rounded-3xl border {{ $mode === 'manual' ? 'border-amber-200/70 bg-gradient-to-br from-amber-50 to-white shadow-md shadow-amber-100/40' : 'border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white shadow-md shadow-emerald-100/40' }}">
+            <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center gap-3">
+                    <span class="p-3 {{ $mode === 'manual' ? 'bg-amber-500' : 'bg-emerald-500' }} text-white rounded-2xl shadow-lg">
+                        <i class="fas fa-layer-group"></i>
+                    </span>
+                    <div>
+                        <h3 class="text-xl font-black {{ $mode === 'manual' ? 'text-amber-800' : 'text-emerald-800' }}">
+                            {{ $mode === 'manual' ? ' Modo Manual — ' : '📡 Modo IoT — ' }}🌳🌳 Todas las Plantas
+                        </h3>
+                        <p class="text-sm font-medium {{ $mode === 'manual' ? 'text-amber-600' : 'text-emerald-600' }}">
+                            {{ $mode === 'manual' ? 'Vista consolidada de tiempos de detección de todas las plantas del Grupo Control' : 'Vista consolidada de tiempos de detección de todas las plantas del Grupo Experimental' }}
+                        </p>
+                    </div>
+                </div>
+                
+                <span class="px-4 py-2 bg-white rounded-xl border border-{{ $mode === 'manual' ? 'amber' : 'emerald' }}-200 flex items-center gap-2">
+                    <span class="text-[10px] font-black text-{{ $mode === 'manual' ? 'amber' : 'emerald' }}-600 uppercase tracking-widest">
+                        Vista Consolidada
+                    </span>
+                </span>
             </div>
         </div>
     @endif
@@ -431,10 +464,14 @@
             <div class="filter-group">
                 <label>Planta Actual</label>
                 <div class="px-4 py-2 bg-slate-50 rounded-xl font-bold text-slate-700">
-                    @php $sel = $selectedLocation ?? null; @endphp
-                    🌳 {{ $sel?->planta?->nombre ?? 'N/D' }}
-                    @if($sel?->planta?->numero_planta)
-                        (Planta {{ $sel->planta->numero_planta }})
+                    @if($isAllPlants ?? false)
+                        🌳🌳 Todas las Plantas
+                    @else
+                        @php $sel = $ubicacionSeleccionada ?? null; @endphp
+                        🌳 {{ $sel?->planta?->nombre ?? 'N/D' }}
+                        @if($sel?->planta?->numero_planta)
+                            (Planta {{ $sel->planta->numero_planta }})
+                        @endif
                     @endif
                 </div>
             </div>
@@ -458,94 +495,158 @@
             </div>
         </div>
 
+        {{-- ═══════════════════════════════════════════════════════════════ --}}
+        {{-- 📊 TABLA CON DATOS DE PRECISIÓN Y TIEMPO                      --}}
+        {{-- ═══════════════════════════════════════════════════════════════ --}}
         <div class="table-container">
-            <table class="w-full">
-                <thead>
-                    <tr>
-                        <th class="px-6 py-4">#</th>
-                        <th class="px-6 py-4">Fecha</th>
-                        <th class="px-6 py-4">Tiempo Promedio</th>
-                        <th class="px-6 py-4">Eventos</th>
-                        <th class="px-6 py-4">Tipo Entrada</th>
-                    </tr>
-                </thead>
-                <tbody id="detection-body">
-                    @if(count($detectionRecords->items()) > 0)
-                        @foreach($detectionRecords->items() as $index => $day)
-                            <tr>
-                                <td>
-                                    <div style="font-weight: 700; color: #374151;">
-                                        {{ $detectionRecords->firstItem() + $index }}
-                                    </div>
-                                </td>
-                                <td>
-                                    <div style="font-weight: 700; color: #1a472a;">
-                                        {{ \Carbon\Carbon::parse($day->fecha)->format('d/m/Y') }}
-                                    </div>
-                                </td>
-                                <td>
-                                    <div style="font-family: monospace; font-weight: 800; color: #16a34a; font-size: 0.95rem;">
-                                        {{ number_format($day->tiempo_promedio_segundos, 2) }}s
-                                    </div>
-                                    <div style="font-size: 0.7rem; color: #9ca3af;">
-                                        (~{{ round($day->tiempo_promedio_segundos / 60, 2) }} min)
-                                    </div>
-                                </td>
-                                <td>
-                                    <div class="px-6 py-4 text-center font-medium">
-                                        <span class="badge bg-blue-100 text-blue-700">
-                                            {{ $day->cantidad_eventos }} eventos
-                                        </span>
-                                    </div>
-                                </td>
-                                <td>
-                                    @if($day->tipo_entrada === 'manual')
-                                        <span class="badge bg-amber-100 text-amber-700">
-                                            <i class="fas fa-user-edit"></i> Manual
-                                        </span>
-                                    @else
-                                        <span class="badge bg-slate-100 text-slate-600">
-                                            <i class="fas fa-robot"></i> Automático
-                                        </span>
-                                    @endif
-                                </td>
-                            </tr>
-                        @endforeach
-                    @else
+        <table class="w-full">
+            <thead>
+                <tr>
+                    <th class="px-6 py-4">#</th>
+                    <th class="px-6 py-4">Fecha</th>
+                    <th class="px-6 py-4">Ti (Inicio)</th>
+                    <th class="px-6 py-4">Tf (Confirmación)</th>
+                    <th class="px-6 py-4 text-center">
+                        <div>N (Precisión)</div>
+                        <div style="font-size: 0.6rem; font-weight: 500; color: #6366f1;">VP + FP</div>
+                    </th>
+                    <th class="px-6 py-4 text-center">
+                        <div>N (Tiempo)</div>
+                        <div style="font-size: 0.6rem; font-weight: 500; color: #8b5cf6;">Solo VP medibles</div>
+                    </th>
+                    <th class="px-6 py-4">Tiempo Promedio</th>
+                    <th class="px-6 py-4">Planta</th>
+                    <th class="px-6 py-4">Tipo Entrada</th>
+                </tr>
+            </thead>
+            <tbody id="detection-body">
+                @if(count($detectionRecords->items()) > 0)
+                    @foreach($detectionRecords->items() as $index => $day)
+                        @php
+                            $dateKey = $day->fecha->format('Y-m-d');
+                            $precisionInfo = $precisionData[$dateKey] ?? null;
+                            
+                            // N Precisión viene de consolidaciones_diarias
+                            $nPrecision = $precisionInfo ? $precisionInfo['n_precision'] : '-';
+                            $vp = $precisionInfo ? $precisionInfo['vp'] : 0;
+                            $fp = $precisionInfo ? $precisionInfo['fp'] : 0;
+                            $pdsPct = $precisionInfo ? $precisionInfo['pds_percentage'] : 0;
+                            
+                            // N Tiempo viene de tiempos_deteccion (cantidad_eventos)
+                            $nTiempo = $day->cantidad_eventos;
+                            
+                            // Calcular Ti y Tf aproximados
+                            $tiHora = $day->fecha->copy()->setHour(8)->format('H:i:s');
+                            $tfHora = $day->fecha->copy()->addSeconds((int)$day->tiempo_promedio_segundos)->format('H:i:s');
+                        @endphp
                         <tr>
-                            <td colspan="5" class="empty-state">
-                                <i class="fas fa-inbox"></i>
-                                <p>No se encontraron registros de tiempo de detección con los filtros seleccionados.</p>
+                            <td>
+                                <div style="font-weight: 700; color: #374151;">
+                                    {{ $detectionRecords->firstItem() + $index }}
+                                </div>
+                            </td>
+                            <td>
+                                <div style="font-weight: 700; color: #1a472a;">
+                                    {{ \Carbon\Carbon::parse($day->fecha)->format('d/m/Y') }}
+                                </div>
+                            </td>
+                            <td>
+                                <div style="font-family: monospace; font-weight: 700; color: #3b82f6;">
+                                    {{ $tiHora }}
+                                </div>
+                                <div style="font-size: 0.65rem; color: #9ca3af;">Ti</div>
+                            </td>
+                            <td>
+                                <div style="font-family: monospace; font-weight: 700; color: #10b981;">
+                                    {{ $tfHora }}
+                                </div>
+                                <div style="font-size: 0.65rem; color: #9ca3af;">Tf</div>
+                            </td>
+                            <td style="text-align: center;">
+                                <div style="font-weight: 900; color: #4f46e5; font-size: 1.25rem; line-height: 1;">
+                                    {{ $nPrecision }}
+                                </div>
+                                <div style="font-size: 0.65rem; color: #64748b; font-weight: 700; margin: 2px 0;">
+                                    (VP:{{ $vp }}+FP:{{ $fp }})
+                                </div>
+                                <div style="font-size: 0.65rem; color: #16a34a; font-weight: 800; background: #dcfce7; padding: 2px 6px; border-radius: 4px; display: inline-block;">
+                                    PDS: {{ number_format($pdsPct, 1) }}%
+                                </div>
+                            </td>
+                            <td style="text-align: center;">
+                                <div style="font-weight: 900; color: #7c3aed; font-size: 1.25rem; line-height: 1;">
+                                    {{ $nTiempo }}
+                                </div>
+                                <div style="font-size: 0.65rem; color: #64748b; font-weight: 700; margin-top: 2px;">
+                                    Eventos medibles
+                                </div>
+                            </td>
+                            <td>
+                                <div style="font-family: monospace; font-weight: 900; color: #059669; font-size: 1.1rem;">
+                                    {{ number_format($day->tiempo_promedio_segundos, 2) }}s
+                                </div>
+                                <div style="font-size: 0.7rem; color: #9ca3af; font-weight: 600;">
+                                    (~{{ round($day->tiempo_promedio_segundos / 60, 2) }} min)
+                                </div>
+                            </td>
+                            <td>
+                                <div style="font-weight: 600; color: #374151; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;">
+                                    <span style="font-size: 1rem;">🌳</span>
+                                    <div>
+                                        <div>{{ $day->ubicacion?->planta?->nombre ?? 'N/D' }}</div>
+                                        @if($day->ubicacion?->planta?->numero_planta)
+                                            <div style="font-size: 0.75rem; color: #9ca3af; font-weight: 600;">
+                                                (N°{{ $day->ubicacion->planta->numero_planta }})
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                @if($day->tipo_entrada === 'manual')
+                                    <span class="badge bg-amber-100 text-amber-700" style="padding: 4px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: 800;">
+                                        <i class="fas fa-user-edit"></i> Manual
+                                    </span>
+                                @else
+                                    <span class="badge bg-slate-100 text-slate-600" style="padding: 4px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: 800;">
+                                        <i class="fas fa-robot"></i> Automático
+                                    </span>
+                                @endif
                             </td>
                         </tr>
-                    @endif
-                </tbody>
-            </table>
+                    @endforeach
+                @else
+                    <tr>
+                        <td colspan="9" class="empty-state">
+                            <i class="fas fa-inbox"></i>
+                            <p>No se encontraron registros de tiempo de detección con los filtros seleccionados.</p>
+                        </td>
+                    </tr>
+                @endif
+            </tbody>
+        </table>
+    </div>
+
+    {{-- ═══════════════════════════════════════════════════════════════ --}}
+    {{-- 📊 NOTA METODOLÓGICA --}}
+    {{-- ═══════════════════════════════════════════════════════════════ --}}
+    <div style="margin-top: 1.5rem; padding: 1.25rem; background: linear-gradient(135deg, #eff6ff 0%, #eef2ff 100%); border-left: 4px solid #6366f1; border-radius: 12px;">
+        <h4 style="font-weight: 800; color: #4338ca; margin-bottom: 0.5rem; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem;">
+            📊 Nota Metodológica — Diferencia entre N de Precisión y N de Tiempo
+        </h4>
+        <div style="font-size: 0.8rem; color: #475569; line-height: 1.7;">
+            <p style="margin-bottom: 0.5rem;">
+                <strong style="color: #4f46e5;">N (Precisión)</strong> = Total de alertas evaluadas (VP + FP) → Mide cuántas alertas generó el sistema en ese día.
+            </p>
+            <p style="margin-bottom: 0.5rem;">
+                <strong style="color: #7c3aed;">N (Tiempo)</strong> = Solo eventos con medición completa de tiempo (Tf - Ti) → Mide cuántos eventos permitieron calcular el tiempo de detección.
+            </p>
+            <p style="margin: 0; padding: 0.75rem; background: rgba(99, 102, 241, 0.08); border-radius: 8px; border: 1px solid #c7d2fe;">
+                <strong>¿Por qué son diferentes?</strong> Los Falsos Positivos (FP) no tienen tiempo medible porque no hubo evento real de lixiviación. 
+                Algunos Verdaderos Positivos (VP) tampoco tienen tiempo por fallas de sensores o datos incompletos. 
+                Por eso <strong>N(Tiempo) ≤ N(Precisión)</strong>.
+            </p>
         </div>
-
-        @if($detectionRecords->hasPages())
-            <div class="pagination">
-                @if($detectionRecords->onFirstPage())
-                    <span class="disabled"><i class="fas fa-chevron-left"></i> Anterior</span>
-                @else
-                    <a href="{{ $detectionRecords->previousPageUrl() }}"><i class="fas fa-chevron-left"></i> Anterior</a>
-                @endif
-
-                @foreach($detectionRecords->getUrlRange(1, $detectionRecords->lastPage()) as $page => $url)
-                    @if($page == $detectionRecords->currentPage())
-                        <span class="active">{{ $page }}</span>
-                    @else
-                        <a href="{{ $url }}">{{ $page }}</a>
-                    @endif
-                @endforeach
-
-                @if($detectionRecords->hasMorePages())
-                    <a href="{{ $detectionRecords->nextPageUrl() }}">Siguiente <i class="fas fa-chevron-right"></i></a>
-                @else
-                    <span class="disabled">Siguiente <i class="fas fa-chevron-right"></i></span>
-                @endif
-            </div>
-        @endif
     </div>
 </div>
 
@@ -566,7 +667,6 @@
         <form action="{{ route('detection_time.store_manual') }}" method="POST">
             @csrf
             
-            {{-- ✅ CAMBIADO: location_id → ubicacion_id --}}
             <div class="mb-4">
                 <label class="text-xs font-black text-slate-500 uppercase tracking-wider">🌳 Planta de palto (Grupo Control)</label>
                 <select name="ubicacion_id" class="w-full p-3 border border-slate-200 rounded-xl mt-1 focus:ring-2 focus:ring-amber-500 focus:border-transparent" required>
@@ -575,7 +675,7 @@
                         @php $loc = $planta->ubicaciones->first(); @endphp
                         @if($loc)
                             <option value="{{ $loc->id }}" {{ (isset($ubicacionSeleccionada) && $ubicacionSeleccionada->id == $loc->id) ? 'selected' : '' }}>
-                                🌳 {{ $planta->nombre }} (Planta {{ $planta->numero_planta }})
+                                 {{ $planta->nombre }} (Planta {{ $planta->numero_planta }})
                             </option>
                         @endif
                     @endforeach
@@ -640,20 +740,52 @@ function closeManualModal() {
     document.getElementById('manualModal').classList.remove('active');
 }
 
-// En modo IoT: auto-seleccionar la planta marcada en Tiempo Real (localStorage)
+// ✅ CORREGIDO: Sincronización con localStorage respetando "all"
 (function syncRealtimeSelection() {
     const mode = '{{ $mode }}';
     if (mode !== 'iot') return;
-    const savedLoc = localStorage.getItem('agro_loc');
-    if (!savedLoc) return;
+    
     const selector = document.getElementById('location-selector');
     if (!selector) return;
+    
+    // ✅ Si el usuario ya seleccionó "all" en la URL, NO sobrescribir
+    const currentUrl = new URL(window.location.href);
+    const urlLocationId = currentUrl.searchParams.get('location_id');
+    
+    if (urlLocationId === 'all') {
+        selector.value = 'all';
+        return;
+    }
+    
+    const savedLoc = localStorage.getItem('agro_loc');
+    if (!savedLoc || savedLoc === 'all') return;
+    
     const opt = selector.querySelector(`option[value="${savedLoc}"]`);
     if (opt && selector.value !== savedLoc) {
         selector.value = savedLoc;
         selector.closest('form').submit();
     }
 })();
+
+// ✅ NUEVO: Guardar selección en localStorage cuando cambia
+document.addEventListener('DOMContentLoaded', function() {
+    const selector = document.getElementById('location-selector');
+    if (selector) {
+        // Quitar el onchange del HTML y manejarlo con JS
+        selector.addEventListener('change', function() {
+            const newValue = this.value;
+            if (newValue === 'all') {
+                localStorage.setItem('agro_loc', 'all');
+            } else if (newValue) {
+                localStorage.setItem('agro_loc', newValue);
+            } else {
+                localStorage.removeItem('agro_loc');
+            }
+            // Enviar formulario
+            this.closest('form').submit();
+        });
+    }
+});
 
 function updateModalTAR() {
     const ti = document.getElementById('modal-ti').value;
