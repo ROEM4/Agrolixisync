@@ -175,6 +175,9 @@ Route::get('/analisis',             [AnalisisController::class, 'index'])->name(
 Route::get('/analisis/export',      [AnalisisController::class, 'export'])->name('analisis.export');
 Route::post('/analisis/pf-manual',  [AnalisisController::class, 'pfManual'])->name('analisis.pf_manual');
 
+Route::get('/analisis/ubicaciones-disponibles', [AnalisisController::class, 'ubicacionesDisponibles'])
+    ->name('analisis.ubicaciones_disponibles');
+
 // Evaluación de alertas (VP/FP/FN)
 Route::post('/analisis/evaluar-alerta/{alerta}', [AnalisisController::class, 'evaluarAlerta'])->name('analisis.evaluar_alerta');
 Route::post('/analisis/cerrar-dia',              [AnalisisController::class, 'cerrarDia'])->name('analisis.cerrar_dia');

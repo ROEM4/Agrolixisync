@@ -313,19 +313,57 @@
     </div>
 
     {{-- ==================================================================
-         2. RESUMEN METODOLÓGICO
-         ================================================================== --}}
+        2. RESUMEN METODOLÓGICO
+        ================================================================== --}}
     <div class="p-6 bg-gradient-to-r from-slate-50 to-slate-100 border-l-4 border-indigo-500 rounded-r-2xl mb-10 shadow-sm relative overflow-hidden">
         <div class="absolute right-0 top-0 translate-x-4 -translate-y-4 opacity-5 text-9xl pointer-events-none select-none">🔬</div>
         <div class="flex items-start gap-4">
             <div class="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0 shadow-sm border border-indigo-100">
                 <span class="text-lg">📋</span>
             </div>
-            <div>
+            <div class="flex-1">
                 <h4 class="text-xs font-black uppercase text-indigo-700 tracking-widest mb-1 scientific-badge">Resumen Metodológico</h4>
-                <p class="text-sm text-slate-700 leading-relaxed font-semibold italic">
+                <p class="text-sm text-slate-700 leading-relaxed font-semibold italic mb-3">
                     "El grupo control establece la condición real de lixiviación mediante mediciones de conductividad eléctrica, mientras que el sistema IoT evalúa su capacidad de detección comparando sus resultados contra dicha referencia."
                 </p>
+                
+                {{-- NUEVO: FÓRMULA Y VALOR IDEAL --}}
+                <div class="mt-3 p-3 bg-white/60 rounded-xl border border-indigo-200">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="text-sm">📐</span>
+                        <span class="text-xs font-black uppercase text-indigo-700 tracking-wider">Fórmula de Precisión</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-center">
+                        <div class="p-2 bg-indigo-50 rounded-lg">
+                            <div class="text-[9px] font-black uppercase text-indigo-600 mb-1">ILx Ideal</div>
+                            <div class="text-lg font-black text-indigo-800">0.80</div>
+                            <div class="text-[9px] text-indigo-600">FAO (LF 20%)</div>
+                        </div>
+                        <div class="p-2 bg-slate-50 rounded-lg">
+                            <div class="text-[9px] font-black uppercase text-slate-600 mb-1">Fórmula</div>
+                            <div class="text-xs font-mono font-bold text-slate-800">P = (1 - |ILx - 0.8| / 0.8) × 100</div>
+                            <div class="text-[9px] text-slate-600">Error Relativo %</div>
+                        </div>
+                        <div class="p-2 bg-emerald-50 rounded-lg">
+                            <div class="text-[9px] font-black uppercase text-emerald-600 mb-1">ILx = CE_prof / CE_sup</div>
+                            <div class="text-xs font-bold text-emerald-800">Nivel de Lixiviación</div>
+                            <div class="text-[9px] text-emerald-600">Relación de Conductividades</div>
+                        </div>
+                    </div>
+                </div>
+                
+                {{-- CLASIFICACIÓN DE NIVELES --}}
+                <div class="mt-3 flex flex-wrap gap-2">
+                    <span class="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-black border border-blue-200">
+                        🔵 Baja: ILx &lt; 0.4
+                    </span>
+                    <span class="inline-flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-[10px] font-black border border-amber-200">
+                        🟡 Media: 0.6 ≤ ILx ≤ 1.0
+                    </span>
+                    <span class="inline-flex items-center gap-1 px-3 py-1 bg-red-100 text-red-700 rounded-full text-[10px] font-black border border-red-200">
+                        🔴 Alta: ILx &gt; 1.0
+                    </span>
+                </div>
             </div>
         </div>
     </div>
@@ -371,7 +409,17 @@
                                     $ceProf = (float) ($record['ce_profunda'] ?? 0);
                                     $ilx = $ceSup > 0 ? round($ceProf / $ceSup, 4) : 0;
                                     $precision = (float) ($record['porcentaje_pf'] ?? 0);
-                                    $estadoMock = $ilx > 1.05 ? 'Alta pérdida' : ($ilx >= 0.9 ? 'Normal' : 'Baja pérdida');
+                                    // Clasificación según tu metodología: Baja (<0.4), Media (0.6-1.0), Alta (>1.0)
+                                    if ($ilx < 0.4) {
+                                        $estadoMock = 'Baja pérdida';
+                                        $estadoClass = 'bg-blue-100 text-blue-700';
+                                    } elseif ($ilx >= 0.6 && $ilx <= 1.0) {
+                                        $estadoMock = 'Pérdida media';
+                                        $estadoClass = 'bg-amber-100 text-amber-700';
+                                    } else {
+                                        $estadoMock = 'Alta pérdida';
+                                        $estadoClass = 'bg-red-100 text-red-700';
+                                    }
                                 @endphp
                                 <tr class="hover:bg-slate-50/50 transition-colors">
                                     <td class="px-4 py-3 font-bold text-slate-700">
@@ -384,7 +432,7 @@
                                     <td class="px-3 py-3 font-black text-amber-700">{{ number_format($precision, 1) }}%</td>
                                     <td class="px-3 py-3 text-center font-mono text-slate-600">{{ $record['subparcela'] }}</td>
                                     <td class="px-3 py-3">
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black {{ $estadoMock === 'Alta pérdida' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700' }}">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black {{ $estadoClass }}">
                                             {{ $estadoMock }}
                                         </span>
                                     </td>
@@ -402,119 +450,127 @@
             </div>
         </div>
 
-        {{-- ==================================================================
-             TABLA GRUPO EXPERIMENTAL (IoT) - CON BOTÓN CERRAR DÍA
-             ================================================================== --}}
-        <div class="col-span-1">
-            <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
-                <h3 class="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                    <span class="w-3 h-3 rounded-full bg-indigo-500"></span>
-                    Tabla Diaria: Grupo Experimental (IoT)
-                    @if(isset($ubicacionSeleccionada))
-                        <span class="ml-2 px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-lg text-[10px] font-black border border-indigo-200">
-                            🌳 {{ $ubicacionSeleccionada->planta->nombre ?? 'N/D' }} N°{{ $ubicacionSeleccionada->planta->numero_planta ?? '?' }}
-                        </span>
-                    @endif
-                </h3>
-                
-                <div class="flex items-center gap-3">
-                    <span class="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-[10px] font-black uppercase tracking-wider border border-indigo-200">
-                        {{ count($dailyStats) }} día(s) evaluado(s)
+    {{-- ==================================================================
+        TABLA GRUPO EXPERIMENTAL (IoT) - CON BOTÓN CERRAR DÍA
+        ================================================================== --}}
+    <div class="col-span-1">
+        <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+            <h3 class="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-indigo-500"></span>
+                Tabla Diaria: Grupo Experimental (IoT)
+                @if(isset($ubicacionSeleccionada))
+                    <span class="ml-2 px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-lg text-[10px] font-black border border-indigo-200">
+                        🌳 {{ $ubicacionSeleccionada->planta->nombre ?? 'N/D' }} N°{{ $ubicacionSeleccionada->planta->numero_planta ?? '?' }}
                     </span>
-                    
-                    {{-- ✅ BOTÓN CERRAR DÍA (visible cuando hay evaluaciones pendientes) --}}
-                    @if(isset($ubicacionSeleccionada) && ($estadoDia ?? '') === 'progreso')
-                        <button type="button" onclick="closeDay()" 
-                                class="close-day-header-btn">
-                            <span>🔒</span>
-                            <span>Cerrar Día</span>
-                        </button>
-                    @elseif(isset($ubicacionSeleccionada) && ($estadoDia ?? '') === 'cerrado')
-                        <span class="day-closed-badge">
-                            <span>✅</span>
-                            <span>Día Cerrado</span>
-                        </span>
-                    @endif
-                </div>
-            </div>
-
-            <div class="academic-card">
-                <div class="overflow-x-auto w-full">
-                    @if(!isset($ubicacionSeleccionada))
-                        {{-- ⚠️ MENSAJE SI NO HAY PLANTA SELECCIONADA --}}
-                        <div class="p-12 text-center">
-                            <div class="text-6xl mb-4">🎯</div>
-                            <h4 class="text-lg font-black text-slate-700 mb-2">Selecciona una Planta para ver sus datos</h4>
-                            <p class="text-sm text-slate-500 mb-4">
-                                Ve a <a href="{{ route('realtime') }}" class="text-indigo-600 font-bold hover:underline">Monitoreo en Tiempo Real</a> 
-                                y selecciona una planta del grupo experimental, o usa el selector superior.
-                            </p>
-                            <div class="inline-flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 rounded-xl text-xs font-bold border border-amber-200">
-                                💡 Los datos se sincronizan automáticamente con realtime.blade.php
-                            </div>
-                        </div>
-                    @else
-                        <table class="w-full text-xs text-left">
-                            <thead class="bg-slate-50/50 border-b border-slate-100">
-                                <tr>
-                                    <th class="px-4 py-3 text-[9px] font-extrabold uppercase tracking-wider">Planta de palto</th>
-                                    <th class="px-4 py-3 text-[9px] font-extrabold uppercase tracking-wider">Fecha</th>
-                                    <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider text-center">VP</th>
-                                    <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider text-center">FP</th>
-                                    <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider text-center bg-slate-100/80 font-black">Total Alertas</th>
-                                    <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider">PDS %</th>
-                                    <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider">Estado</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-100">
-                                @forelse($dailyStats as $day)
-                                    @php
-                                        $totalAlerts = ($day['vp'] ?? 0) + ($day['fp'] ?? 0);
-                                    @endphp
-                                    <tr class="hover:bg-slate-50/50 transition-colors">
-                                        <td class="px-4 py-3 font-bold text-slate-700">
-                                            🌳 {{ $day['planta_nombre'] }} 
-                                            <span class="text-slate-400 font-medium text-[10px]">N°{{ $day['planta_numero'] ?? '?' }}</span>
-                                        </td>
-                                        <td class="px-4 py-3 font-bold">{{ $day['date_label'] }}</td>
-                                        <td class="px-3 py-3 text-center font-bold text-emerald-700">{{ $day['vp'] }}</td>
-                                        <td class="px-3 py-3 text-center font-bold text-red-600">{{ $day['fp'] }}</td>
-                                        <td class="px-3 py-3 text-center font-black bg-slate-50/50 text-slate-800 font-mono text-sm">{{ $totalAlerts }}</td>
-                                        <td class="px-3 py-3">
-                                            <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-black {{ $day['pds_percentage'] >= 80 ? 'bg-emerald-100 text-emerald-700 border border-emerald-300' : 'bg-amber-100 text-amber-700 border border-amber-300' }}">
-                                                {{ number_format($day['pds_percentage'], 1) }}%
-                                            </span>
-                                        </td>
-                                        <td class="px-3 py-3">
-                                            @if($day['consolidado'] ?? false)
-                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700">
-                                                    🔒 Consolidado
-                                                </span>
-                                            @else
-                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-700">
-                                                    ⏳ Pendiente
-                                                </span>
-                                            @endif
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="7" class="px-6 py-12 text-center text-slate-400 italic font-medium">
-                                            <div class="text-4xl mb-3">📭</div>
-                                            <div class="font-bold text-slate-600 mb-1">Sin evaluaciones para esta planta</div>
-                                            <div class="text-xs">
-                                                {{ $mensajeDia ?? 'Evalúa alertas desde la sección inferior para ver datos aquí.' }}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    @endif
-                </div>
+                @elseif($isAllPlants ?? false)
+                    <span class="ml-2 px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-lg text-[10px] font-black border border-emerald-200">
+                        🌳 Todas las Plantas (Consolidado)🌳
+                    </span>
+                @endif
+            </h3>
+            
+            <div class="flex items-center gap-3">
+                <span class="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-[10px] font-black uppercase tracking-wider border border-indigo-200">
+                    {{ count($dailyStats) }} día(s) evaluado(s)
+                </span>
+                
+                {{-- ✅ BOTÓN CERRAR DÍA (visible cuando hay evaluaciones pendientes) --}}
+                @if(isset($ubicacionSeleccionada) && ($estadoDia ?? '') === 'progreso')
+                    <button type="button" onclick="closeDay()" 
+                            class="close-day-header-btn">
+                        <span>🔒</span>
+                        <span>Cerrar Día</span>
+                    </button>
+                @elseif(isset($ubicacionSeleccionada) && ($estadoDia ?? '') === 'cerrado')
+                    <span class="day-closed-badge">
+                        <span>✅</span>
+                        <span>Día Cerrado</span>
+                    </span>
+                @endif
             </div>
         </div>
 
+        <div class="academic-card">
+            <div class="overflow-x-auto w-full">
+                {{-- ✅ CORRECCIÓN: Solo mostrar mensaje si NO hay planta seleccionada Y NO es "Todas las Plantas" --}}
+                @if(!isset($ubicacionSeleccionada) && !($isAllPlants ?? false))
+                    {{-- ⚠️ MENSAJE SI NO HAY PLANTA SELECCIONADA --}}
+                    <div class="p-12 text-center">
+                        <div class="text-6xl mb-4">🎯</div>
+                        <h4 class="text-lg font-black text-slate-700 mb-2">Selecciona una Planta para ver sus datos</h4>
+                        <p class="text-sm text-slate-500 mb-4">
+                            Ve a <a href="{{ route('realtime') }}" class="text-indigo-600 font-bold hover:underline">Monitoreo en Tiempo Real</a> 
+                            y selecciona una planta del grupo experimental, o usa el selector superior.
+                        </p>
+                        <div class="inline-flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 rounded-xl text-xs font-bold border border-amber-200">
+                            💡 Los datos se sincronizan automáticamente con realtime.blade.php
+                        </div>
+                    </div>
+                @else
+                    {{-- ✅ MOSTRAR TABLA (ya sea para planta individual o todas las plantas) --}}
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-slate-50/50 border-b border-slate-100">
+                            <tr>
+                                <th class="px-4 py-3 text-[9px] font-extrabold uppercase tracking-wider">Planta de palto</th>
+                                <th class="px-4 py-3 text-[9px] font-extrabold uppercase tracking-wider">Fecha</th>
+                                <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider text-center">VP</th>
+                                <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider text-center">FP</th>
+                                <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider text-center bg-slate-100/80 font-black">Total Alertas</th>
+                                <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider">PDS %</th>
+                                <th class="px-3 py-3 text-[9px] font-extrabold uppercase tracking-wider">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @forelse($dailyStats as $day)
+                                @php
+                                    $totalAlerts = ($day['vp'] ?? 0) + ($day['fp'] ?? 0);
+                                @endphp
+                                <tr class="hover:bg-slate-50/50 transition-colors">
+                                    <td class="px-4 py-3 font-bold text-slate-700">
+                                        🌳 {{ $day['planta_nombre'] }} 
+                                        <span class="text-slate-400 font-medium text-[10px]">N°{{ $day['planta_numero'] ?? '?' }}</span>
+                                    </td>
+                                    <td class="px-4 py-3 font-bold">{{ $day['date_label'] }}</td>
+                                    <td class="px-3 py-3 text-center font-bold text-emerald-700">{{ $day['vp'] }}</td>
+                                    <td class="px-3 py-3 text-center font-bold text-red-600">{{ $day['fp'] }}</td>
+                                    <td class="px-3 py-3 text-center font-black bg-slate-50/50 text-slate-800 font-mono text-sm">{{ $totalAlerts }}</td>
+                                    <td class="px-3 py-3">
+                                        <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-black {{ $day['pds_percentage'] >= 80 ? 'bg-emerald-100 text-emerald-700 border border-emerald-300' : 'bg-amber-100 text-amber-700 border border-amber-300' }}">
+                                            {{ number_format($day['pds_percentage'], 1) }}%
+                                        </span>
+                                    </td>
+                                    <td class="px-3 py-3">
+                                        @if($day['consolidado'] ?? false)
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700">
+                                                🔒 Consolidado
+                                            </span>
+                                        @else
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-700">
+                                                ⏳ Pendiente
+                                            </span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="7" class="px-6 py-12 text-center text-slate-400 italic font-medium">
+                                        <div class="text-4xl mb-3">📭</div>
+                                        <div class="font-bold text-slate-600 mb-1">Sin evaluaciones registradas</div>
+                                        <div class="text-xs">
+                                            @if($isAllPlants ?? false)
+                                                No hay evaluaciones para ninguna planta del grupo experimental.
+                                            @else
+                                                {{ $mensajeDia ?? 'Evalúa alertas desde la sección inferior para ver datos aquí.' }}
+                                            @endif
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                @endif
+            </div>
+        </div>
     </div>
 
     {{-- ==================================================================
@@ -647,36 +703,41 @@
 
         <form action="{{ route('analisis.pf_manual') }}" method="POST">
             @csrf
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="text-xs font-black text-slate-500 uppercase tracking-wider">🌳 Ubicación (Location)</label>
-                    <select name="ubicacion_id" class="w-full p-3 border border-slate-200 rounded-xl mt-1 focus:ring-2 focus:ring-amber-500 focus:border-transparent" required>
-                        <option value="">Seleccione ubicación GC</option>
-                        @foreach($plantasGC as $planta)
-                            @foreach($planta->ubicaciones as $loc)
-                                @if($loc->grupo_experimental === 'control')
-                                    <option value="{{ $loc->id }}">
-                                        {{ $planta->nombre }} #{{ $planta->numero_planta }} — {{ $loc->nombre }}
-                                    </option>
-                                @endif
-                            @endforeach
-                        @endforeach
-                    </select>
+            
+            {{-- ⚠️ PRIMERO LA FECHA, LUEGO LA UBICACIÓN --}}
+            <div class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="text-sm">📅</span>
+                    <span class="text-xs font-black uppercase text-amber-700 tracking-wider">Paso 1: Selecciona la Fecha</span>
                 </div>
+                <input type="date" name="fecha_registro" id="fecha_registro" value="{{ date('Y-m-d') }}" 
+                       class="w-full p-3 border-2 border-amber-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent font-bold" required />
+                <p class="text-[10px] text-amber-600 mt-1 font-semibold">💡 Se mostrarán solo las ubicaciones sin registros para esta fecha</p>
+            </div>
 
-                <div>
-                    <label class="text-xs font-black text-slate-500 uppercase tracking-wider">📅 Fecha</label>
-                    <input type="date" name="fecha_registro" value="{{ date('Y-m-d') }}" class="w-full p-3 border border-slate-200 rounded-xl mt-1 focus:ring-2 focus:ring-amber-500 focus:border-transparent" required />
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="md:col-span-2">
+                    <label class="text-xs font-black text-slate-500 uppercase tracking-wider">
+                        🌳 Ubicación (Location) 
+                        <span id="ubicacionesDisponibles" class="text-emerald-600 ml-2"></span>
+                    </label>
+                    <select name="ubicacion_id" id="ubicacion_selector" class="w-full p-3 border border-slate-200 rounded-xl mt-1 focus:ring-2 focus:ring-amber-500 focus:border-transparent" required>
+                        <option value="">🔄 Selecciona primero una fecha...</option>
+                    </select>
+                    <div id="loadingUbicaciones" class="hidden mt-2 flex items-center gap-2 text-xs text-slate-500">
+                        <span class="animate-spin">⏳</span>
+                        <span>Cargando ubicaciones disponibles...</span>
+                    </div>
                 </div>
 
                 <div>
                     <label class="text-xs font-black text-slate-500 uppercase tracking-wider">CE Superficial (dS/m)</label>
-                    <input type="number" step="0.001" name="ce_superficial" placeholder="Ej: 0.450" class="w-full p-3 border border-slate-200 rounded-xl mt-1 focus:ring-2 focus:ring-amber-500 focus:border-transparent" required />
+                    <input type="number" step="0.001" id="ce_superficial" name="ce_superficial" placeholder="Ej: 0.450" class="w-full p-3 border border-slate-200 rounded-xl mt-1 focus:ring-2 focus:ring-amber-500 focus:border-transparent" required />
                 </div>
 
                 <div>
                     <label class="text-xs font-black text-slate-500 uppercase tracking-wider">CE Profunda (dS/m)</label>
-                    <input type="number" step="0.001" name="ce_profunda" placeholder="Ej: 0.520" class="w-full p-3 border border-slate-200 rounded-xl mt-1 focus:ring-2 focus:ring-amber-500 focus:border-transparent" required />
+                    <input type="number" step="0.001" id="ce_profunda" name="ce_profunda" placeholder="Ej: 0.520" class="w-full p-3 border border-slate-200 rounded-xl mt-1 focus:ring-2 focus:ring-amber-500 focus:border-transparent" required />
                 </div>
 
                 <div>
@@ -685,8 +746,31 @@
                 </div>
 
                 <div>
-                    <label class="text-xs font-black text-slate-500 uppercase tracking-wider">📊 % Precisión del Sistema</label>
-                    <input type="number" step="0.1" min="0" max="100" name="porcentaje_pf" placeholder="Ej: 85.5" class="w-full p-3 border border-slate-200 rounded-xl mt-1 focus:ring-2 focus:ring-amber-500 focus:border-transparent" required />
+                    <label class="text-xs font-black text-slate-500 uppercase tracking-wider">📊 % Precisión</label>
+                    <input type="number" step="0.1" min="0" max="100" id="porcentaje_pf" name="porcentaje_pf" placeholder="Se calcula automáticamente" class="w-full p-3 border-2 border-indigo-300 rounded-xl mt-1 bg-indigo-50 font-bold text-indigo-700" readonly />
+                    <p class="text-[10px] text-indigo-600 mt-1 font-semibold">💡 Se calcula automáticamente al ingresar CE</p>
+                </div>
+            </div>
+
+            {{-- PANEL DE CÁLCULO EN TIEMPO REAL --}}
+            <div id="calcPreview" class="mt-4 p-4 bg-gradient-to-r from-slate-50 to-slate-100 border-l-4 border-indigo-500 rounded-r-xl hidden">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="text-lg">🧮</span>
+                    <span class="text-xs font-black uppercase text-indigo-700 tracking-wider">Cálculo en Tiempo Real</span>
+                </div>
+                <div class="grid grid-cols-3 gap-3 text-center">
+                    <div>
+                        <div class="text-[9px] font-black uppercase text-slate-500">ILx</div>
+                        <div class="text-lg font-black text-slate-800" id="previewILx">—</div>
+                    </div>
+                    <div>
+                        <div class="text-[9px] font-black uppercase text-slate-500">Categoría</div>
+                        <div class="text-sm font-black px-2 py-1 rounded-lg" id="previewCategoria">—</div>
+                    </div>
+                    <div>
+                        <div class="text-[9px] font-black uppercase text-slate-500">Precisión</div>
+                        <div class="text-lg font-black text-indigo-700" id="previewPrecision">—</div>
+                    </div>
                 </div>
             </div>
 
@@ -1040,5 +1124,168 @@ document.querySelectorAll('.eval-overlay').forEach(overlay => {
         if (e.target === overlay) overlay.classList.remove('active');
     });
 });
+
+// ===== CÁLCULO AUTOMÁTICO DE PRECISIÓN =====
+const ceSupInput = document.getElementById('ce_superficial');
+const ceProfInput = document.getElementById('ce_profunda');
+const precisionInput = document.getElementById('porcentaje_pf');
+const calcPreview = document.getElementById('calcPreview');
+const previewILx = document.getElementById('previewILx');
+const previewCategoria = document.getElementById('previewCategoria');
+const previewPrecision = document.getElementById('previewPrecision');
+
+const ILX_IDEAL = 0.8; // Valor ideal según FAO (20% de fracción de lixiviación)
+
+function calcularPrecision() {
+    const ceSup = parseFloat(ceSupInput.value) || 0;
+    const ceProf = parseFloat(ceProfInput.value) || 0;
+    
+    if (ceSup > 0 && ceProf > 0) {
+        // Calcular ILx
+        const ilx = ceProf / ceSup;
+        
+        // Calcular Precisión
+        const precision = (1 - Math.abs(ilx - ILX_IDEAL) / ILX_IDEAL) * 100;
+        const precisionMax = Math.max(0, Math.min(100, precision));
+        
+        // Determinar categoría
+        let categoria = '';
+        let categoriaColor = '';
+        if (ilx < 0.4) {
+            categoria = 'Baja';
+            categoriaColor = 'bg-blue-100 text-blue-700';
+        } else if (ilx >= 0.6 && ilx <= 1.0) {
+            categoria = 'Media';
+            categoriaColor = 'bg-amber-100 text-amber-700';
+        } else {
+            categoria = 'Alta';
+            categoriaColor = 'bg-red-100 text-red-700';
+        }
+        
+        // Actualizar campo de precisión
+        precisionInput.value = precisionMax.toFixed(1);
+        
+        // Mostrar panel de cálculo
+        calcPreview.classList.remove('hidden');
+        previewILx.textContent = ilx.toFixed(3);
+        previewCategoria.textContent = categoria;
+        previewCategoria.className = `text-sm font-black px-2 py-1 rounded-lg ${categoriaColor}`;
+        previewPrecision.textContent = precisionMax.toFixed(1) + '%';
+        
+        console.log(`ILx: ${ilx.toFixed(3)}, Precisión: ${precisionMax.toFixed(1)}%, Categoría: ${categoria}`);
+    } else {
+        // Limpiar si no hay valores
+        precisionInput.value = '';
+        calcPreview.classList.add('hidden');
+    }
+}
+
+// Event listeners
+if (ceSupInput && ceProfInput) {
+    ceSupInput.addEventListener('input', calcularPrecision);
+    ceProfInput.addEventListener('input', calcularPrecision);
+}
+
+// Reset al cerrar el modal
+document.getElementById('closeManualBtn')?.addEventListener('click', () => {
+    ceSupInput.value = '';
+    ceProfInput.value = '';
+    precisionInput.value = '';
+    calcPreview.classList.add('hidden');
+});
+
+document.getElementById('cancelManual')?.addEventListener('click', () => {
+    ceSupInput.value = '';
+    ceProfInput.value = '';
+    precisionInput.value = '';
+    calcPreview.classList.add('hidden');
+});
+
+// ===== CARGA DINÁMICA DE UBICACIONES DISPONIBLES =====
+const fechaInput = document.getElementById('fecha_registro');
+const ubicacionSelector = document.getElementById('ubicacion_selector');
+const loadingUbicaciones = document.getElementById('loadingUbicaciones');
+const ubicacionesDisponibles = document.getElementById('ubicacionesDisponibles');
+
+// Función para cargar ubicaciones disponibles
+async function cargarUbicacionesDisponibles() {
+    const fecha = fechaInput.value;
+    
+    if (!fecha) {
+        ubicacionSelector.innerHTML = '<option value="">🔄 Selecciona primero una fecha...</option>';
+        return;
+    }
+    
+    // Mostrar loading
+    loadingUbicaciones.classList.remove('hidden');
+    ubicacionSelector.innerHTML = '<option value="">⏳ Cargando...</option>';
+    ubicacionSelector.disabled = true;
+    
+    try {
+        const response = await fetch(`{{ url('analisis/ubicaciones-disponibles') }}?fecha=${fecha}`, {
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
+        const data = await response.json();
+        
+        // Actualizar el select
+        if (data.disponibles.length > 0) {
+            ubicacionSelector.innerHTML = '<option value="">Seleccione ubicación GC</option>';
+            
+            data.disponibles.forEach(ubicacion => {
+                const option = document.createElement('option');
+                option.value = ubicacion.id;
+                option.textContent = `🌳 Planta de palto #${ubicacion.numero} — ${ubicacion.descripcion}`;
+                ubicacionSelector.appendChild(option);
+            });
+            
+            // Mostrar contador
+            ubicacionesDisponibles.textContent = `✅ ${data.total_disponibles} disponible(s)`;
+            ubicacionesDisponibles.className = 'text-emerald-600 ml-2 font-bold';
+            
+        } else {
+            ubicacionSelector.innerHTML = '<option value="">⚠️ Todas las ubicaciones ya tienen registros para esta fecha</option>';
+            ubicacionesDisponibles.textContent = '❌ Sin disponibles';
+            ubicacionesDisponibles.className = 'text-red-600 ml-2 font-bold';
+        }
+        
+        ubicacionSelector.disabled = false;
+        
+    } catch (error) {
+        console.error('Error al cargar ubicaciones:', error);
+        ubicacionSelector.innerHTML = '<option value="">❌ Error al cargar ubicaciones</option>';
+        ubicacionesDisponibles.textContent = '⚠️ Error';
+        ubicacionesDisponibles.className = 'text-red-600 ml-2 font-bold';
+    } finally {
+        loadingUbicaciones.classList.add('hidden');
+    }
+}
+
+// Event listener para el cambio de fecha
+if (fechaInput) {
+    fechaInput.addEventListener('change', cargarUbicacionesDisponibles);
+    
+    // Cargar ubicaciones al abrir el modal
+    document.getElementById('openManualBtn')?.addEventListener('click', () => {
+        setTimeout(cargarUbicacionesDisponibles, 100);
+    });
+}
+
+// Reset al cerrar el modal
+document.getElementById('closeManualBtn')?.addEventListener('click', () => {
+    fechaInput.value = '{{ date('Y-m-d') }}';
+    ubicacionSelector.innerHTML = '<option value="">🔄 Selecciona primero una fecha...</option>';
+    ubicacionesDisponibles.textContent = '';
+});
+
+document.getElementById('cancelManual')?.addEventListener('click', () => {
+    fechaInput.value = '{{ date('Y-m-d') }}';
+    ubicacionSelector.innerHTML = '<option value="">🔄 Selecciona primero una fecha...</option>';
+    ubicacionesDisponibles.textContent = '';
+});
+
 </script>
 @endsection

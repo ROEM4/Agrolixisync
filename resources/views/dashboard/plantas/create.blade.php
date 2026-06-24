@@ -78,9 +78,15 @@
 
             <div class="field">
                 <label>Número de planta</label>
-                <input type="number" name="numero_planta" min="1" max="999"
-                       value="{{ old('numero_planta') }}" required
-                       placeholder="Ej: 1, 2, 3...">
+                <input 
+                    type="number"
+                    name="numero_planta"
+                    id="numeroPlanta"
+                    min="1"
+                    max="999"
+                    value="{{ old('numero_planta') }}"
+                    required
+                    placeholder="Ej: 1, 2, 3...">
                 <div class="field-info">Debe ser un número único y creciente.</div>
             </div>
 
@@ -102,10 +108,15 @@
             {{-- Device Code: solo para Grupo Experimental --}}
             <div class="field device-code-field" id="deviceCodeField">
                 <label>📡 Device Code (IoT)</label>
-                <input type="text" name="device_code" id="deviceCodeInput"
-                       value="{{ old('device_code') }}"
-                       placeholder="Ej: AGR-001, AGR-002...">
-                <div class="field-info">Código único del dispositivo IoT asignado a esta planta.</div>
+                <input type="text"
+                    name="device_code"
+                    id="deviceCodeInput"
+                    value="{{ old('device_code') }}"
+                    readonly>
+
+                <div class="field-info">
+                    Se genera automáticamente usando el número de planta.
+                </div>
             </div>
 
             <div class="field">
@@ -137,21 +148,62 @@
 </div>
 
 <script>
-function toggleDeviceCode() {
+<script>
+
+function generarDeviceCode() {
+
     const grupo = document.getElementById('grupoSelect').value;
-    const field = document.getElementById('deviceCodeField');
+    const numero = document.getElementById('numeroPlanta').value;
     const input = document.getElementById('deviceCodeInput');
-    if (grupo === 'experimental') {
-        field.style.display = 'block';
-        input.required = true;
+
+    if (grupo === 'experimental' && numero) {
+        input.value = 'A' + numero;
     } else {
-        field.style.display = 'none';
-        input.required = false;
         input.value = '';
     }
 }
-// Ejecutar al cargar si hay valor previo (old input)
-document.addEventListener('DOMContentLoaded', toggleDeviceCode);
+
+
+function toggleDeviceCode() {
+
+    const grupo = document.getElementById('grupoSelect').value;
+    const field = document.getElementById('deviceCodeField');
+    const input = document.getElementById('deviceCodeInput');
+
+    if (grupo === 'experimental') {
+
+        field.style.display = 'block';
+        input.required = true;
+
+    } else {
+
+        field.style.display = 'none';
+        input.required = false;
+        input.value = '';
+
+    }
+
+    generarDeviceCode();
+}
+
+
+
+document.addEventListener('DOMContentLoaded', function() {
+
+    toggleDeviceCode();
+
+
+    document
+        .getElementById('numeroPlanta')
+        .addEventListener('input', generarDeviceCode);
+
+
+    document
+        .getElementById('grupoSelect')
+        .addEventListener('change', toggleDeviceCode);
+
+});
+
 </script>
 
 @endsection

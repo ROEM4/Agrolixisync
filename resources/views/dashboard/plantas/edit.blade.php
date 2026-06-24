@@ -45,7 +45,9 @@
     }
 
     .field-info {
-        font-size:0.72rem; color:#9ca3af; margin-top:0.3rem;
+        font-size:0.72rem;
+        color:#9ca3af;
+        margin-top:0.3rem;
     }
 
     .btn-submit {
@@ -60,12 +62,14 @@
     }
 </style>
 
+
 <div class="form-wrap">
 
     <div class="page-header">
         <h1>✏️ Editar Planta</h1>
         <p>Modificar datos de la planta</p>
     </div>
+
 
     @if($errors->any())
         <div style="background:#fee2e2;border:1px solid #fecaca;color:#dc2626;padding:0.75rem 1rem;border-radius:7px;margin-bottom:1rem;font-size:0.85rem;">
@@ -75,88 +79,227 @@
         </div>
     @endif
 
+
     <div class="form-card">
 
         <form method="POST" action="{{ route('plantas.update', $planta->id) }}">
+
             @csrf
             @method('PUT')
 
-            @php $ubicacion = $planta->ubicaciones->first(); @endphp
+
+            @php
+                $ubicacion = $planta->ubicaciones->first();
+            @endphp
+
 
             <div class="field">
+
                 <label>Número de planta</label>
-                <input type="number"
+
+                <input 
+                    type="number"
                     name="numero_planta"
+                    id="numeroPlanta"
                     min="1"
                     max="999"
                     value="{{ old('numero_planta', $planta->numero_planta) }}"
                     required>
+
             </div>
 
+
+
             <div class="field">
+
                 <label>Nombre</label>
-                <input type="text"
+
+                <input 
+                    type="text"
                     name="nombre"
                     value="{{ old('nombre', $planta->nombre) }}"
                     required>
+
             </div>
 
+
+
             <div class="field">
+
                 <label>Grupo</label>
-                <select name="grupo_experimental" id="grupoSelect" required onchange="toggleDeviceCode()">
-                    <option value="control"      {{ $planta->grupo_experimental == 'control'      ? 'selected' : '' }}>🟢 Control (GC)</option>
-                    <option value="experimental" {{ $planta->grupo_experimental == 'experimental' ? 'selected' : '' }}>🔵 Experimental (GE)</option>
+
+                <select 
+                    name="grupo_experimental"
+                    id="grupoSelect"
+                    required
+                    onchange="toggleDeviceCode()">
+
+
+                    <option value="control"
+                        {{ $planta->grupo_experimental == 'control' ? 'selected' : '' }}>
+                        🟢 Control (GC)
+                    </option>
+
+
+                    <option value="experimental"
+                        {{ $planta->grupo_experimental == 'experimental' ? 'selected' : '' }}>
+                        🔵 Experimental (GE)
+                    </option>
+
+
                 </select>
+
             </div>
 
-            {{-- Device Code: solo para Grupo Experimental --}}
+
+
+            {{-- Device Code automático --}}
+
             <div class="field" id="deviceCodeField">
+
                 <label>📡 Device Code (IoT)</label>
-                <input type="text" name="device_code" id="deviceCodeInput"
-                       value="{{ old('device_code', $ubicacion?->codigo_dispositivo) }}"
-                       placeholder="Ej: AGR-001">
-                <div class="field-info">Código único del dispositivo IoT. Solo aplica para Grupo Experimental.</div>
+
+
+                <input 
+                    type="text"
+                    name="device_code"
+                    id="deviceCodeInput"
+                    readonly>
+
+
+                <div class="field-info">
+                    Código generado automáticamente: A + número de planta.
+                </div>
+
             </div>
+
+
+
 
             <div class="field">
+
                 <label>📍 Ubicación / Nombre del punto</label>
-                <input type="text"
+
+
+                <input 
+                    type="text"
                     name="ubicacion_nombre"
                     value="{{ old('ubicacion_nombre', $ubicacion?->nombre) }}"
                     required
                     placeholder="Ej: Sector Norte, Parcela 1A...">
+
             </div>
+
+
+
 
             <div class="field">
+
                 <label>Cultivo</label>
+
+
                 <select name="tipo_cultivo">
-                    <option value="palta" {{ $planta->tipo_cultivo == 'palta' ? 'selected' : '' }}>Palta</option>
+
+                    <option value="palta"
+                    {{ $planta->tipo_cultivo == 'palta' ? 'selected' : '' }}>
+                        Palta
+                    </option>
+
                 </select>
+
             </div>
 
+
+
+
             <div style="display:flex;gap:0.75rem;margin-top:1.5rem;">
-                <a href="{{ route('plantas.index') }}" style="flex:1;padding:0.7rem;background:#f3f4f6;color:#374151;border:none;border-radius:8px;font-weight:700;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;">
+
+                <a href="{{ route('plantas.index') }}"
+                style="flex:1;padding:0.7rem;background:#f3f4f6;color:#374151;border-radius:8px;font-weight:700;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;">
                     Cancelar
                 </a>
+
+
                 <button type="submit" class="btn-submit" style="flex:1;">
                     Guardar cambios
                 </button>
+
+
             </div>
+
 
         </form>
 
     </div>
+
 </div>
 
+
+
 <script>
-function toggleDeviceCode() {
+
+function generarDeviceCode(){
+
+    const grupo = document.getElementById('grupoSelect').value;
+    const numero = document.getElementById('numeroPlanta').value;
+    const input = document.getElementById('deviceCodeInput');
+
+
+    if(grupo === 'experimental' && numero){
+
+        input.value = "A" + numero;
+
+    }else{
+
+        input.value = "";
+
+    }
+
+}
+
+
+
+function toggleDeviceCode(){
+
     const grupo = document.getElementById('grupoSelect').value;
     const field = document.getElementById('deviceCodeField');
-    const input = document.getElementById('deviceCodeInput');
-    field.style.display = grupo === 'experimental' ? 'block' : 'none';
-    input.required = grupo === 'experimental';
+
+
+    if(grupo === 'experimental'){
+
+        field.style.display = "block";
+
+    }else{
+
+        field.style.display = "none";
+
+    }
+
+
+    generarDeviceCode();
+
 }
-document.addEventListener('DOMContentLoaded', toggleDeviceCode);
+
+
+
+document.addEventListener('DOMContentLoaded', function(){
+
+    toggleDeviceCode();
+
+
+    document
+    .getElementById('numeroPlanta')
+    .addEventListener('input', generarDeviceCode);
+
+
+    document
+    .getElementById('grupoSelect')
+    .addEventListener('change', toggleDeviceCode);
+
+
+});
+
 </script>
+
 
 @endsection

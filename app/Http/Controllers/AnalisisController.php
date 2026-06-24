@@ -221,7 +221,7 @@ class AnalisisController extends Controller
                     'ce_superficial' => $record->ce_superficial,
                     'ce_profunda' => $record->ce_profunda,
                     'porcentaje_pf' => $record->porcentaje_pf,
-                    'subparcela' => $record->subparcela ?? 'Evento #1',
+                    'subparcela' => $record->subparcela ?? '',
                 ];
             });
 
@@ -270,7 +270,7 @@ class AnalisisController extends Controller
             'ce_profunda' => $request->ce_profunda,
             'ce_referencia' => $request->ce_superficial,
             'ce_medida' => $request->ce_profunda,
-            'subparcela' => 'Evento #' . $request->events,
+            'subparcela' => '' . $request->events,
             'porcentaje_pf' => $request->porcentaje_pf,
         ]);
 
@@ -374,6 +374,40 @@ class AnalisisController extends Controller
         ]);
     }
 
+    // ═══ MÉTODO: OBTENER UBICACIONES DISPONIBLES PARA INGRESO MANUAL ═══
+    public function ubicacionesDisponibles(Request $request)
+    {
+        $fecha = $request->input('fecha', now()->toDateString());
+        
+        // Obtener todas las ubicaciones del Grupo Control
+        $todasUbicaciones = Ubicacion::with('planta')
+            ->whereHas('planta', fn($q) => $q->where('grupo_experimental', 'control'))
+            ->get();
+        
+        // Obtener las ubicaciones que YA tienen registro para esa fecha
+        $ubicacionesConRegistro = RegistroPorcentajePerdida::whereDate('fecha_registro', $fecha)
+            ->pluck('ubicacion_id')
+            ->toArray();
+        
+        // Filtrar solo las que NO tienen registro
+        $ubicacionesDisponibles = $todasUbicaciones->filter(function($ubicacion) use ($ubicacionesConRegistro) {
+            return !in_array($ubicacion->id, $ubicacionesConRegistro);
+        });
+        
+        return response()->json([
+            'disponibles' => $ubicacionesDisponibles->map(function($ubicacion) {
+                return [
+                    'id' => $ubicacion->id,
+                    'nombre' => $ubicacion->planta->nombre ?? 'N/D',
+                    'numero' => $ubicacion->planta->numero_planta ?? '?',
+                    'descripcion' => $ubicacion->nombre ?? 'Sin descripción'
+                ];
+            }),
+            'total_disponibles' => $ubicacionesDisponibles->count(),
+            'total_registradas' => count($ubicacionesConRegistro),
+            'fecha' => $fecha
+        ]);
+    }
     // ═══ MÉTODO: EXPORTAR ═══
     public function export()
     {
