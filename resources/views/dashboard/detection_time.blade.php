@@ -325,7 +325,6 @@
                     
                     @if($mode === 'iot')
                         <optgroup label=" GRUPO EXPERIMENTAL (IoT)">
-                            {{-- ✅ NUEVA OPCIÓN: TODAS LAS PLANTAS --}}
                             <option value="all" {{ $location_id === 'all' ? 'selected' : '' }}>
                                 🌳 Todas las Plantas (Consolidado)
                             </option>
@@ -340,7 +339,6 @@
                         </optgroup>
                     @else
                         <optgroup label="🟢 GRUPO CONTROL (Manual)">
-                            {{-- ✅ NUEVA OPCIÓN: TODAS LAS PLANTAS --}}
                             <option value="all" {{ $location_id === 'all' ? 'selected' : '' }}>
                                 🌳 Todas las Plantas (Consolidado)
                             </option>
@@ -392,7 +390,6 @@
             </div>
         </div>
     @elseif($isAllPlants ?? false)
-        {{-- ✅ NUEVO: PANEL PARA TODAS LAS PLANTAS --}}
         <div class="mb-8 p-8 rounded-3xl border {{ $mode === 'manual' ? 'border-amber-200/70 bg-gradient-to-br from-amber-50 to-white shadow-md shadow-amber-100/40' : 'border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white shadow-md shadow-emerald-100/40' }}">
             <div class="flex items-center justify-between mb-6">
                 <div class="flex items-center gap-3">
@@ -504,10 +501,6 @@
                         <th class="px-6 py-4">Ti (Inicio)</th>
                         <th class="px-6 py-4">Tf (Confirmación)</th>
                         <th class="px-6 py-4 text-center">
-                            <div>N (Precisión)</div>
-                            <div style="font-size: 0.6rem; font-weight: 500; color: #6366f1;">VP + FP</div>
-                        </th>
-                        <th class="px-6 py-4 text-center">
                             <div>N (Tiempo)</div>
                             <div style="font-size: 0.6rem; font-weight: 500; color: #8b5cf6;">Solo VP medibles</div>
                         </th>
@@ -520,15 +513,6 @@
                     @if(count($detectionRecords->items()) > 0)
                         @foreach($detectionRecords->items() as $index => $day)
                             @php
-                                $dateKey = $day->fecha->format('Y-m-d');
-                                $precisionInfo = $precisionData[$dateKey] ?? null;
-                                
-                                // N Precisión viene de consolidaciones_diarias
-                                $nPrecision = $precisionInfo ? $precisionInfo['n_precision'] : '-';
-                                $vp = $precisionInfo ? $precisionInfo['vp'] : 0;
-                                $fp = $precisionInfo ? $precisionInfo['fp'] : 0;
-                                $pdsPct = $precisionInfo ? $precisionInfo['pds_percentage'] : 0;
-                                
                                 // N Tiempo viene de tiempos_deteccion (cantidad_eventos)
                                 $nTiempo = $day->cantidad_eventos;
                                 
@@ -558,17 +542,6 @@
                                         {{ $tfHora }}
                                     </div>
                                     <div style="font-size: 0.65rem; color: #9ca3af;">Tf</div>
-                                </td>
-                                <td style="text-align: center;">
-                                    <div style="font-weight: 900; color: #4f46e5; font-size: 1.25rem; line-height: 1;">
-                                        {{ $nPrecision }}
-                                    </div>
-                                    <div style="font-size: 0.65rem; color: #64748b; font-weight: 700; margin: 2px 0;">
-                                        (VP:{{ $vp }}+FP:{{ $fp }})
-                                    </div>
-                                    <div style="font-size: 0.65rem; color: #16a34a; font-weight: 800; background: #dcfce7; padding: 2px 6px; border-radius: 4px; display: inline-block;">
-                                        PDS: {{ number_format($pdsPct, 1) }}%
-                                    </div>
                                 </td>
                                 <td style="text-align: center;">
                                     <div style="font-weight: 900; color: #7c3aed; font-size: 1.25rem; line-height: 1;">
@@ -614,7 +587,7 @@
                         @endforeach
                     @else
                         <tr>
-                            <td colspan="9" class="empty-state">
+                            <td colspan="8" class="empty-state">
                                 <i class="fas fa-inbox"></i>
                                 <p>No se encontraron registros de tiempo de detección con los filtros seleccionados.</p>
                             </td>
@@ -624,27 +597,6 @@
             </table>
         </div>
 
-        {{-- ═══════════════════════════════════════════════════════════════ --}}
-        {{-- 📊 NOTA METODOLÓGICA --}}
-        {{-- ═══════════════════════════════════════════════════════════════ --}}
-        <div style="margin-top: 1.5rem; padding: 1.25rem; background: linear-gradient(135deg, #eff6ff 0%, #eef2ff 100%); border-left: 4px solid #6366f1; border-radius: 12px;">
-            <h4 style="font-weight: 800; color: #4338ca; margin-bottom: 0.5rem; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem;">
-                📊 Nota Metodológica — Diferencia entre N de Precisión y N de Tiempo
-            </h4>
-            <div style="font-size: 0.8rem; color: #475569; line-height: 1.7;">
-                <p style="margin-bottom: 0.5rem;">
-                    <strong style="color: #4f46e5;">N (Precisión)</strong> = Total de alertas evaluadas (VP + FP) → Mide cuántas alertas generó el sistema en ese día.
-                </p>
-                <p style="margin-bottom: 0.5rem;">
-                    <strong style="color: #7c3aed;">N (Tiempo)</strong> = Solo eventos con medición completa de tiempo (Tf - Ti) → Mide cuántos eventos permitieron calcular el tiempo de detección.
-                </p>
-                <p style="margin: 0; padding: 0.75rem; background: rgba(99, 102, 241, 0.08); border-radius: 8px; border: 1px solid #c7d2fe;">
-                    <strong>¿Por qué son diferentes?</strong> Los Falsos Positivos (FP) no tienen tiempo medible porque no hubo evento real de lixiviación. 
-                    Algunos Verdaderos Positivos (VP) tampoco tienen tiempo por fallas de sensores o datos incompletos. 
-                    Por eso <strong>N(Tiempo) ≤ N(Precisión)</strong>.
-                </p>
-            </div>
-        </div>
 
 {{-- ═══════════════════════════════════════════════════════════════════ --}}
 {{-- 🆕 MODAL: REGISTRO MANUAL                                         --}}
@@ -744,7 +696,6 @@ function closeManualModal() {
     const selector = document.getElementById('location-selector');
     if (!selector) return;
     
-    // ✅ Si el usuario ya seleccionó "all" en la URL, NO sobrescribir
     const currentUrl = new URL(window.location.href);
     const urlLocationId = currentUrl.searchParams.get('location_id');
     
@@ -767,7 +718,6 @@ function closeManualModal() {
 document.addEventListener('DOMContentLoaded', function() {
     const selector = document.getElementById('location-selector');
     if (selector) {
-        // Quitar el onchange del HTML y manejarlo con JS
         selector.addEventListener('change', function() {
             const newValue = this.value;
             if (newValue === 'all') {
@@ -777,7 +727,6 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 localStorage.removeItem('agro_loc');
             }
-            // Enviar formulario
             this.closest('form').submit();
         });
     }
@@ -828,7 +777,6 @@ document.addEventListener('DOMContentLoaded', function(){
     const manual = {{ $manualCount ?? 0 }};
     const automatic = {{ $automaticCount ?? 0 }};
 
-    // Avg Time Line
     const ctx1 = document.getElementById('dtAvgTimeChart');
     if (ctx1) new Chart(ctx1, {
         type: 'line',
@@ -836,7 +784,6 @@ document.addEventListener('DOMContentLoaded', function(){
         options: { responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true } } }
     });
 
-    // Events Bar
     const ctx2 = document.getElementById('dtEventsChart');
     if (ctx2) new Chart(ctx2, {
         type: 'bar',
@@ -844,7 +791,6 @@ document.addEventListener('DOMContentLoaded', function(){
         options: { responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true, stepSize:1 } } }
     });
 
-    // Manual vs Auto Doughnut
     const ctx3 = document.getElementById('dtManualAutoChart');
     if (ctx3) new Chart(ctx3, {
         type: 'doughnut',
