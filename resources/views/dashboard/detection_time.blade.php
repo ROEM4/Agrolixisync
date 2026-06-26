@@ -54,7 +54,7 @@
     .page-header { 
         margin-bottom: 2rem; 
         display: flex; 
-        justify-content: space-between; 
+        justify-content: space-between;
         align-items: flex-end;
     }
     .page-header h1 { margin: 0; font-size: 1.8rem; font-weight: 800; color: #1a472a; letter-spacing: -0.02em; }
@@ -122,7 +122,7 @@
     th { 
         padding: 1rem; 
         text-align: left; 
-        color: #4b5563; 
+        color: #4b5563;
         font-weight: 700; 
         font-size: 0.75rem; 
         text-transform: uppercase;
@@ -199,10 +199,23 @@
         border-radius: 24px;
         width: 100%;
         max-width: 520px;
+        max-height: 90vh; /* Límite de altura para que no desborde la pantalla */
+        overflow-y: auto;
+        /* Permite scroll interno si el contenido es muy largo */
         padding: 2rem;
         box-shadow: 0 25px 60px rgba(0,0,0,0.25);
         animation: evalPop 0.25s ease-out;
     }
+
+    /* Ajuste para pantallas pequeñas */
+    @media (max-width: 640px) {
+        .eval-box {
+            padding: 1.5rem;
+            max-height: 95vh;
+            border-radius: 16px;
+        }
+    }
+
     @keyframes evalPop {
         from { transform: scale(0.92); opacity: 0; }
         to   { transform: scale(1);    opacity: 1; }
@@ -215,6 +228,12 @@
         margin-bottom: 1rem;
         padding-bottom: 1rem;
         border-bottom: 2px solid #f1f5f9;
+        position: sticky;
+        /* Fija el encabezado en la parte superior */
+        top: 0;
+        background: #fff;
+        /* Oculta el texto que pasa por debajo al hacer scroll */
+        z-index: 10;
     }
     .eval-header h3 {
         font-weight: 800;
@@ -242,11 +261,13 @@
         80%, 100% { opacity: 0; }
     }
     .live-dot {
-        width: 8px; height: 8px; border-radius: 50%; background: #22c55e;
+        width: 8px;
+        height: 8px; border-radius: 50%; background: #22c55e;
         position: relative; display: inline-block;
     }
     .live-dot::after {
-        content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+        content: ""; position: absolute; top: 0;
+        left: 0; right: 0; bottom: 0;
         border-radius: 50%; background: inherit; animation: pulse-ring 1.5s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
     }
 </style>
@@ -322,11 +343,10 @@
                 </label>
                 <select name="location_id" id="location-selector" 
                         class="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-{{ $mode === 'iot' ? 'emerald' : 'amber' }}-500 transition-all shadow-sm">
-                    
                     @if($mode === 'iot')
                         <optgroup label=" GRUPO EXPERIMENTAL (IoT)">
                             <option value="all" {{ $location_id === 'all' ? 'selected' : '' }}>
-                                🌳 Todas las Plantas (Consolidado)
+                                🌳- Todas las Plantas (Consolidado)
                             </option>
                             @foreach($plantasGE as $planta)
                                 @php $loc = $planta->ubicaciones->first(); @endphp
@@ -340,7 +360,7 @@
                     @else
                         <optgroup label="🟢 GRUPO CONTROL (Manual)">
                             <option value="all" {{ $location_id === 'all' ? 'selected' : '' }}>
-                                🌳 Todas las Plantas (Consolidado)
+                                🌳- Todas las Plantas (Consolidado)
                             </option>
                             @foreach($plantasGC as $planta)
                                 @php $loc = $planta->ubicaciones->first(); @endphp
@@ -398,7 +418,7 @@
                     </span>
                     <div>
                         <h3 class="text-xl font-black {{ $mode === 'manual' ? 'text-amber-800' : 'text-emerald-800' }}">
-                            {{ $mode === 'manual' ? ' Modo Manual — ' : '📡 Modo IoT — ' }}🌳🌳 Todas las Plantas
+                            {{ $mode === 'manual' ? ' Modo Manual — ' : '📡 Modo IoT — ' }}🌳- Todas las Plantas
                         </h3>
                         <p class="text-sm font-medium {{ $mode === 'manual' ? 'text-amber-600' : 'text-emerald-600' }}">
                             {{ $mode === 'manual' ? 'Vista consolidada de tiempos de detección de todas las plantas del Grupo Control' : 'Vista consolidada de tiempos de detección de todas las plantas del Grupo Experimental' }}
@@ -462,7 +482,7 @@
                 <label>Planta Actual</label>
                 <div class="px-4 py-2 bg-slate-50 rounded-xl font-bold text-slate-700">
                     @if($isAllPlants ?? false)
-                        🌳🌳 Todas las Plantas
+                        🌳 Todas las Plantas
                     @else
                         @php $sel = $ubicacionSeleccionada ?? null; @endphp
                         🌳 {{ $sel?->planta?->nombre ?? 'N/D' }}
@@ -591,15 +611,12 @@
                                 <i class="fas fa-inbox"></i>
                                 <p>No se encontraron registros de tiempo de detección con los filtros seleccionados.</p>
                             </td>
-                        </tr>
+                         </tr>
                     @endif
                 </tbody>
             </table>
-        </div>
-
-
-{{-- ═══════════════════════════════════════════════════════════════════ --}}
-{{-- 🆕 MODAL: REGISTRO MANUAL                                         --}}
+        </div> </div> </div> {{-- ═══════════════════════════════════════════════════════════════════ --}}
+{{-- 🆕 MODAL: REGISTRO MANUAL                                           --}}
 {{-- ═══════════════════════════════════════════════════════════════════ --}}
 <div id="manualModal" class="eval-overlay">
     <div class="eval-box">
@@ -735,7 +752,6 @@ document.addEventListener('DOMContentLoaded', function() {
 function updateModalTAR() {
     const ti = document.getElementById('modal-ti').value;
     const tf = document.getElementById('modal-tf').value;
-    
     if (!ti || !tf) {
         document.getElementById('modal-tar-preview').textContent = '--';
         return;
@@ -743,12 +759,10 @@ function updateModalTAR() {
     
     const [tiH, tiM, tiS] = ti.split(':').map(Number);
     const [tfH, tfM, tfS] = tf.split(':').map(Number);
-    
     const tiSec = tiH * 3600 + tiM * 60 + tiS;
     const tfSec = tfH * 3600 + tfM * 60 + tfS;
     
     const diff = Math.abs(tfSec - tiSec);
-    
     document.getElementById('modal-tar-preview').textContent = diff;
     
     if (diff >= 60) {

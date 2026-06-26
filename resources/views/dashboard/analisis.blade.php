@@ -65,10 +65,22 @@
         border-radius: 24px;
         width: 100%;
         max-width: 520px;
+        max-height: 90vh; /* Limita la altura al 90% del viewport */
+        overflow-y: auto; /* Permite scroll interno si el contenido es muy largo */
         padding: 2rem;
         box-shadow: 0 25px 60px rgba(0,0,0,0.25);
         animation: evalPop 0.25s ease-out;
     }
+
+    /* Ajuste responsivo para pantallas más pequeñas (Laptops pequeñas o celulares) */
+    @media (max-width: 640px) {
+        .eval-box {
+            padding: 1.5rem;
+            max-height: 95vh;
+            border-radius: 16px;
+        }
+    }
+
     @keyframes evalPop {
         from { transform: scale(0.92); opacity: 0; }
         to   { transform: scale(1);    opacity: 1; }
@@ -81,6 +93,10 @@
         margin-bottom: 1rem;
         padding-bottom: 1rem;
         border-bottom: 2px solid #f1f5f9;
+        position: sticky; /* Opcional: Mantiene el encabezado arriba al hacer scroll */
+        top: 0;
+        background: #fff;
+        z-index: 10;
     }
     .eval-header h3 {
         font-family: var(--outfit-font);
@@ -258,7 +274,7 @@
         box-shadow: 0 4px 12px rgba(15,23,42,0.2);
     }
     .close-day-header-btn:hover { 
-        transform: translateY(-2px); 
+        transform: translateY(-2px);
         box-shadow: 0 8px 20px rgba(15,23,42,0.3);
     }
 
@@ -440,7 +456,8 @@
                             @empty
                                 <tr>
                                     <td colspan="8" class="px-6 py-12 text-center text-slate-300 italic font-medium">
-                                        No hay registros de control. Usa "Ingreso Manual" para agregar datos del Grupo Control.
+                                        No hay registros de control.
+                                        Usa "Ingreso Manual" para agregar datos del Grupo Control.
                                     </td>
                                 </tr>
                             @endforelse
@@ -464,7 +481,7 @@
                     </span>
                 @elseif($isAllPlants ?? false)
                     <span class="ml-2 px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-lg text-[10px] font-black border border-emerald-200">
-                        🌳 Todas las Plantas (Consolidado)🌳
+                        🌳- Todas las Plantas (Consolidado)
                     </span>
                 @endif
             </h3>
@@ -576,7 +593,7 @@
     {{-- ==================================================================
          4. KPIs y Gráficos
          ================================================================== --}}
-        @if(isset($ubicacionSeleccionada) || ($isAllPlants ?? false))        
+    @if(isset($ubicacionSeleccionada) || ($isAllPlants ?? false))        
         {{-- KPIs --}}
         <div class="mb-8">
             <div class="academic-card p-6 border-t-4 border-indigo-500 max-w-3xl mx-auto">
@@ -645,7 +662,8 @@
     {{-- ==================================================================
          5. EVALUACIÓN (Alertas Pendientes)
          ================================================================== --}}
-        @if(isset($ubicacionSeleccionada) || ($isAllPlants ?? false))        <div class="academic-card p-6 mb-10 border-t-4 border-indigo-500">
+    @if(isset($ubicacionSeleccionada) || ($isAllPlants ?? false))        
+        <div class="academic-card p-6 mb-10 border-t-4 border-indigo-500">
             <div class="flex items-center justify-between mb-5">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600">
@@ -679,8 +697,6 @@
                             </span>
                         </div>
                         <button type="button" class="alert-eval-btn" id="btn-eval-{{ $alert->id }}" data-alert-id="{{ $alert->id }}" data-lote-name="{{ addslashes($alert->ubicacion->planta->nombre ?? 'N/D') }}" data-date="{{ \Carbon\Carbon::parse($alert->created_at)->format('d/m/Y H:i') }}" data-type="{{ addslashes($alert->tipo ?? 'Lixiviación') }}" data-device="{{ addslashes($alert->ubicacion->codigo_dispositivo ?? 'N/D') }}">Evaluar</button>
-                            Evaluar
-                        
                     </div>
                 @empty
                     <div class="empty-alerts">
@@ -711,7 +727,7 @@
                     <span class="text-xs font-black uppercase text-amber-700 tracking-wider">Paso 1: Selecciona la Fecha</span>
                 </div>
                 <input type="date" name="fecha_registro" id="fecha_registro" value="{{ date('Y-m-d') }}" 
-                       class="w-full p-3 border-2 border-amber-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent font-bold" required />
+                        class="w-full p-3 border-2 border-amber-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent font-bold" required />
                 <p class="text-[10px] text-amber-600 mt-1 font-semibold">💡 Se mostrarán solo las ubicaciones sin registros para esta fecha</p>
             </div>
 
@@ -884,14 +900,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const url = new URL(window.location.href);
             
             if (newLocId) {
-                localStorage.setItem('agro_loc', newLocId);
+                 localStorage.setItem('agro_loc', newLocId);
                 url.searchParams.set('ubicacion_id', newLocId);
             } else {
                 localStorage.removeItem('agro_loc');
                 url.searchParams.delete('ubicacion_id');
             }
             window.location.href = url.toString();
-        });
+         });
     }
 
     // 4. Escuchar cambios desde realtime (en otra pestaña)
@@ -901,7 +917,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (e.newValue) {
                 url.searchParams.set('ubicacion_id', e.newValue);
             } else {
-                url.searchParams.delete('ubicacion_id');
+               url.searchParams.delete('ubicacion_id');
             }
             window.location.href = url.toString();
         }
@@ -926,7 +942,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 data: {
                     labels: ['Precisión del Sistema', 'Tasa de Error'],
                     datasets: [{
-                        data: [{{ $stats['pds_percentage'] ?? 0 }}, {{ $stats['error_rate'] ?? 0 }}],
+                         data: [{{ $stats['pds_percentage'] ?? 0 }}, {{ $stats['error_rate'] ?? 0 }}],
                         backgroundColor: ['#4f46e5', '#f87171'],
                         borderWidth: 0
                     }]
@@ -934,7 +950,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 plugins: [{
                     id: 'centerText',
                     beforeDraw(chart) {
-                        const { ctx } = chart;
+                         const { ctx } = chart;
                         const meta = chart.getDatasetMeta(0);
                         if (!meta.data.length) return;
                         const x = meta.data[0].x;
@@ -1085,7 +1101,6 @@ function setEval(value) {
 function closeDay() {
     const urlParams = new URLSearchParams(window.location.search);
     const ubicacionId = urlParams.get('ubicacion_id') || localStorage.getItem('agro_loc');
-    
     if (!ubicacionId) {
         alert('⚠️ Selecciona una planta primero antes de cerrar el día.');
         return;
@@ -1093,7 +1108,6 @@ function closeDay() {
     
     if (!confirm('¿Confirmas el cierre del día? Se consolidarán todas las evaluaciones registradas y no podrás modificarlas.')) 
         return;
-        
     fetch("{{ route('analisis.cerrar_dia') }}", {
         method: 'POST',
         headers: {
@@ -1143,7 +1157,6 @@ function calcularPrecision() {
     if (ceSup > 0 && ceProf > 0) {
         // Calcular ILx
         const ilx = ceProf / ceSup;
-        
         // Calcular Precisión
         const precision = (1 - Math.abs(ilx - ILX_IDEAL) / ILX_IDEAL) * 100;
         const precisionMax = Math.max(0, Math.min(100, precision));
@@ -1164,7 +1177,6 @@ function calcularPrecision() {
         
         // Actualizar campo de precisión
         precisionInput.value = precisionMax.toFixed(1);
-        
         // Mostrar panel de cálculo
         calcPreview.classList.remove('hidden');
         previewILx.textContent = ilx.toFixed(3);
@@ -1172,7 +1184,6 @@ function calcularPrecision() {
         previewCategoria.className = `text-sm font-black px-2 py-1 rounded-lg ${categoriaColor}`;
         previewPrecision.textContent = precisionMax.toFixed(1) + '%';
         
-        console.log(`ILx: ${ilx.toFixed(3)}, Precisión: ${precisionMax.toFixed(1)}%, Categoría: ${categoria}`);
     } else {
         // Limpiar si no hay valores
         precisionInput.value = '';
@@ -1210,7 +1221,6 @@ const ubicacionesDisponibles = document.getElementById('ubicacionesDisponibles')
 // Función para cargar ubicaciones disponibles
 async function cargarUbicacionesDisponibles() {
     const fecha = fechaInput.value;
-    
     if (!fecha) {
         ubicacionSelector.innerHTML = '<option value="">🔄 Selecciona primero una fecha...</option>';
         return;
@@ -1228,20 +1238,17 @@ async function cargarUbicacionesDisponibles() {
                 'X-Requested-With': 'XMLHttpRequest'
             }
         });
-        
         const data = await response.json();
         
         // Actualizar el select
         if (data.disponibles.length > 0) {
             ubicacionSelector.innerHTML = '<option value="">Seleccione ubicación GC</option>';
-            
             data.disponibles.forEach(ubicacion => {
                 const option = document.createElement('option');
                 option.value = ubicacion.id;
                 option.textContent = `🌳 Planta de palto #${ubicacion.numero} — ${ubicacion.descripcion}`;
                 ubicacionSelector.appendChild(option);
             });
-            
             // Mostrar contador
             ubicacionesDisponibles.textContent = `✅ ${data.total_disponibles} disponible(s)`;
             ubicacionesDisponibles.className = 'text-emerald-600 ml-2 font-bold';
@@ -1253,7 +1260,6 @@ async function cargarUbicacionesDisponibles() {
         }
         
         ubicacionSelector.disabled = false;
-        
     } catch (error) {
         console.error('Error al cargar ubicaciones:', error);
         ubicacionSelector.innerHTML = '<option value="">❌ Error al cargar ubicaciones</option>';
@@ -1267,7 +1273,6 @@ async function cargarUbicacionesDisponibles() {
 // Event listener para el cambio de fecha
 if (fechaInput) {
     fechaInput.addEventListener('change', cargarUbicacionesDisponibles);
-    
     // Cargar ubicaciones al abrir el modal
     document.getElementById('openManualBtn')?.addEventListener('click', () => {
         setTimeout(cargarUbicacionesDisponibles, 100);
@@ -1286,6 +1291,5 @@ document.getElementById('cancelManual')?.addEventListener('click', () => {
     ubicacionSelector.innerHTML = '<option value="">🔄 Selecciona primero una fecha...</option>';
     ubicacionesDisponibles.textContent = '';
 });
-
 </script>
 @endsection

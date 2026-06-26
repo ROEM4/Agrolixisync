@@ -483,7 +483,7 @@ body {
     <div class="nav-section">Monitoreo</div>
     <a class="nav-link {{ request()->routeIs('dashboard') || request()->routeIs('realtime') || request()->routeIs('monitor') ? 'active' : '' }}"
        href="{{ route('dashboard') }}">
-        <i class="fas fa-satellite-dish"></i> Monitoreo en Tiempo Real
+        <i class="fas fa-satellite-dish"></i> Tiempo Real
         <span class="status-dot" style="margin-left:auto;"></span>
     </a>
 

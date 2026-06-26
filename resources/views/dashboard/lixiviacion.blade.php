@@ -93,11 +93,13 @@
         80%, 100% { opacity: 0; }
     }
     .live-dot {
-        width: 8px; height: 8px; border-radius: 50%; background: #22c55e;
+        width: 8px;
+        height: 8px; border-radius: 50%; background: #22c55e;
         position: relative; display: inline-block;
     }
     .live-dot::after {
-        content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+        content: ""; position: absolute; top: 0;
+        left: 0; right: 0; bottom: 0;
         border-radius: 50%; background: inherit; animation: pulse-ring 1.5s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
     }
 
@@ -125,10 +127,22 @@
         border-radius: 24px;
         width: 100%;
         max-width: 520px;
+        max-height: 90vh; /* Limita la altura al 90% de la ventana */
+        overflow-y: auto; /* Permite hacer scroll interno */
         padding: 2rem;
         box-shadow: 0 25px 60px rgba(0,0,0,0.25);
         animation: evalPop 0.25s ease-out;
     }
+
+    /* Ajuste para pantallas pequeñas */
+    @media (max-width: 640px) {
+        .eval-box {
+            padding: 1.5rem;
+            max-height: 95vh;
+            border-radius: 16px;
+        }
+    }
+
     @keyframes evalPop {
         from { transform: scale(0.92); opacity: 0; }
         to   { transform: scale(1);    opacity: 1; }
@@ -141,6 +155,10 @@
         margin-bottom: 1rem;
         padding-bottom: 1rem;
         border-bottom: 2px solid #f1f5f9;
+        position: sticky; /* Mantiene el encabezado arriba al hacer scroll */
+        top: 0;
+        background: #fff;
+        z-index: 10;
     }
     .eval-header h3 {
         font-weight: 800;
@@ -237,7 +255,7 @@
                         <optgroup label="🔵 GRUPO EXPERIMENTAL (IoT)">
                             {{-- ✅ NUEVA OPCIÓN: TODAS LAS PLANTAS --}}
                             <option value="all" {{ $location_id === 'all' ? 'selected' : '' }}>
-                                🌳🌳 Todas las Plantas (Consolidado)
+                                🌳- Todas las Plantas (Consolidado)
                             </option>
                             @foreach($plantasGE as $planta)
                                 @php $loc = $planta->ubicaciones->first(); @endphp
@@ -252,7 +270,7 @@
                         <optgroup label="🟢 GRUPO CONTROL (Manual)">
                             {{-- ✅ NUEVA OPCIÓN: TODAS LAS PLANTAS --}}
                             <option value="all" {{ $location_id === 'all' ? 'selected' : '' }}>
-                                🌳🌳 Todas las Plantas (Consolidado)
+                                🌳- Todas las Plantas (Consolidado)
                             </option>
                             @foreach($plantasGC as $planta)
                                 @php $loc = $planta->ubicaciones->first(); @endphp
@@ -322,7 +340,7 @@
                     </span>
                     <div>
                         <h3 class="text-xl font-black {{ $mode === 'manual' ? 'text-amber-800' : 'text-emerald-800' }}">
-                            {{ $mode === 'manual' ? '📝 Modo Manual — ' : '📡 Modo IoT — ' }}🌳🌳 Todas las Plantas
+                            {{ $mode === 'manual' ? '📝 Modo Manual — ' : '📡 Modo IoT — ' }}🌳- Todas las Plantas
                         </h3>
                         <p class="text-sm font-medium {{ $mode === 'manual' ? 'text-amber-600' : 'text-emerald-600' }}">
                             {{ $mode === 'manual' ? 'Vista consolidada de todas las plantas del Grupo Control' : 'Vista consolidada de todas las plantas del Grupo Experimental' }}
@@ -405,7 +423,7 @@
                 Tabla de Registro del indicador Nivel de Lixiviación
                 @if($isAllPlants ?? false)
                     <span class="ml-2 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-black border border-emerald-200">
-                        🌳🌳 Todas las Plantas
+                        🌳 Todas las Plantas
                     </span>
                 @elseif(isset($ubicacionSeleccionada))
                     <span class="ml-2 px-3 py-1 bg-indigo-100 text-indigo-700 rounded-lg text-xs font-black border border-indigo-200">
@@ -458,7 +476,6 @@
                                 <td class="px-6 py-4">
                                     @php
                                         $ilxValue = (float) ($record->ilx ?? 0);
-                                        
                                         if ($ilxValue > 1.0) {
                                             $nivelTexto = 'ALTA LIXIVIACIÓN';
                                             $badgeClass = 'bg-red-100 text-red-700 border border-red-200';
@@ -577,12 +594,10 @@
 let locationId = '{{ $location_id }}';
 let pollTimer = null;
 const isCtrl = @json($isCtrl ?? false);
-
 const THRESHOLDS = {
     ce_sup_max : 0.600,
     ce_prof_max: 0.750,
 };
-
 function classifyILx(ilx) {
     if (isNaN(ilx)) return { estado: 'SIN DATOS', icon: '⚪', level: 'none' };
     if (ilx < 0.4) return { estado: 'BAJA LIXIVIACIÓN', icon: '🟢', level: 'low' };
@@ -618,7 +633,6 @@ async function poll() {
 
 function updateCards(ce_s, ce_p, ilx) {
     const safe = (v) => (isNaN(v) ? '--' : v);
-
     document.getElementById('kpi-ce-sup').textContent = safe(ce_s) !== '--' ? ce_s.toFixed(3) : '--';
     document.getElementById('kpi-ce-prof').textContent = safe(ce_p) !== '--' ? ce_p.toFixed(3) : '--';
     document.getElementById('kpi-ilx').textContent = isNaN(ilx) ? '--' : ilx.toFixed(3);
@@ -626,7 +640,6 @@ function updateCards(ce_s, ce_p, ilx) {
     const badgeSup = document.getElementById('status-ce-sup');
     const badgeProf = document.getElementById('status-ce-prof');
     const badgeIlx = document.getElementById('status-ilx');
-
     if (!isNaN(ce_s)) {
         const alert = ce_s > THRESHOLDS.ce_sup_max;
         badgeSup.textContent = alert ? 'ALERTA' : 'OK';
@@ -667,7 +680,6 @@ function updateModalILx() {
     const ce_s = Number(document.getElementById('modal-ce-sup').value);
     const ce_p = Number(document.getElementById('modal-ce-prof').value);
     const ilx = (!isNaN(ce_s) && ce_s > 0 && !isNaN(ce_p)) ? ce_p / ce_s : NaN;
-    
     document.getElementById('modal-ilx-preview').textContent = isNaN(ilx) ? '--' : ilx.toFixed(3);
     
     let estado, badgeClass;
