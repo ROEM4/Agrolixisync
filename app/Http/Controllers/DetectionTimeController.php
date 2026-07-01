@@ -12,9 +12,6 @@ use Carbon\Carbon;
 
 class DetectionTimeController extends Controller
 {
-    /**
-     * Mostrar el análisis de tiempo de detección
-     */
     public function index(Request $request)
     {
         $location_id = $request->query('location_id');
@@ -23,13 +20,10 @@ class DetectionTimeController extends Controller
 
         $isAllPlants = ($location_id === 'all');
 
-        // 🌳 CARGAR PLANTAS POR GRUPO
         $plantasGC = Planta::where('grupo_experimental', 'control')
-            ->with('ubicaciones')
-            ->orderBy('numero_planta')->get();
+            ->with('ubicaciones')->orderBy('numero_planta')->get();
         $plantasGE = Planta::where('grupo_experimental', 'experimental')
-            ->with('ubicaciones')
-            ->orderBy('numero_planta')->get();
+            ->with('ubicaciones')->orderBy('numero_planta')->get();
 
         if ($isAllPlants) {
             $ubicacionSeleccionada = null;
@@ -68,9 +62,7 @@ class DetectionTimeController extends Controller
             $isCtrl = $ubicacionSeleccionada && $ubicacionSeleccionada->grupo_experimental === 'control';
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        // 📊 CONSULTAR REGISTROS DE TIEMPO DE DETECCIÓN
-        // ═══════════════════════════════════════════════════════════════
+        // Consultar registros de tiempo de detección
         $recordsQuery = TiempoDeteccion::with('ubicacion.planta');
 
         if ($isAllPlants) {
@@ -96,26 +88,72 @@ class DetectionTimeController extends Controller
 
         $totalAlertasCount = (clone $recordsQuery)->sum('cantidad_eventos');
         $detectionRecords = $recordsQuery->paginate(15)->withQueryString();
-                // En el método index() de DetectionTimeController.php
 
-        // Después de obtener $detectionRecords, agrega esto:
+        // 🆕 Cargar alertas evaluadas para el modal de detalle (SOLO IoT)
+        $alertasPorDia = [];
+        
+        if ($mode === 'iot') {
+            foreach ($detectionRecords as $record) {
+                $fecha = $record->fecha->format('Y-m-d');
+                $ubicacionId = $record->ubicacion_id;
+                
+                $alertas = Alerta::where('ubicacion_id', $ubicacionId)
+                    ->whereDate('tiempo_alerta', $fecha)
+                    ->with('evaluacion')
+                    ->orderBy('tiempo_alerta', 'asc')
+                    ->get();
+                
+                $alertasFormateadas = $alertas->map(function($alerta) {
+                    $esVP = $alerta->evaluacion && $alerta->evaluacion->etiqueta === 'VP';
+
+                    // ✅ CORRECCIÓN: calcular diferencia igual que alertas.blade.php
+                    // Prioridad: 1) tar del Job (VP real), 2) fecha_resolucion - tiempo_alerta, 3) null
+                    $diferencia = null;
+                    $tieneTiempo = false;
+
+                    if ($alerta->tar && $alerta->tar > 0 && $alerta->tar != 300) {
+                        // TAR calculado por CalcularTiempoDeteccion Job (solo VP)
+                        $diferencia  = (int) $alerta->tar;
+                        $tieneTiempo = true;
+                    } elseif ($alerta->fecha_resolucion && $alerta->tiempo_alerta
+                              && $alerta->fecha_resolucion->gt($alerta->tiempo_alerta)) {
+                        // Fallback: duración real desde detección hasta resolución
+                        $diferencia  = $alerta->fecha_resolucion->diffInSeconds($alerta->tiempo_alerta);
+                        $tieneTiempo = true;
+                    }
+
+                    return [
+                        'id'                    => $alerta->id,
+                        'tiempo_alerta'         => $alerta->tiempo_alerta ? $alerta->tiempo_alerta->format('H:i:s') : 'N/A',
+                        'tiempo_riesgo'         => $alerta->fecha_resolucion ? $alerta->fecha_resolucion->format('H:i:s') : 'N/A',
+                        'etiqueta'              => $alerta->evaluacion ? $alerta->evaluacion->etiqueta : 'Sin evaluar',
+                        'es_vp'                 => $esVP,
+                        'tiene_tiempo'          => $tieneTiempo,
+                        'diferencia_segundos'   => $diferencia,
+                        'diferencia_formateada' => $diferencia !== null ? $diferencia . 's (~' . round($diferencia / 60, 1) . ' min)' : 'N/A',
+                    ];
+                });
+                
+                $alertasPorDia[$record->id] = $alertasFormateadas;
+            }
+        }
+
+        // Agregar Ti y Tf para cada registro
         $detectionRecords->getCollection()->transform(function($record) use ($mode) {
             if ($mode === 'iot') {
-                // Obtener la primera y última alerta del día para esta ubicación
-                $primeraAlerta = \App\Models\Alerta::whereDate('tiempo_alerta', $record->fecha)
+                $primeraAlerta = Alerta::whereDate('tiempo_alerta', $record->fecha)
                     ->where('ubicacion_id', $record->ubicacion_id)
                     ->orderBy('tiempo_alerta', 'asc')
                     ->first();
                 
-                $ultimaAlerta = \App\Models\Alerta::whereDate('tiempo_alerta', $record->fecha)
+                $ultimaAlerta = Alerta::whereDate('tiempo_alerta', $record->fecha)
                     ->where('ubicacion_id', $record->ubicacion_id)
                     ->orderBy('tiempo_alerta', 'desc')
                     ->first();
                 
-                $record->tiempo_inicial = $primeraAlerta ? $primeraAlerta->tiempo_alerta : null;
-                $record->tiempo_final = $ultimaAlerta ? $ultimaAlerta->tiempo_riesgo : null;
+                $record->tiempo_inicial = $primeraAlerta ? $primeraAlerta->tiempo_alerta : $record->fecha->copy()->setHour(8);
+                $record->tiempo_final = $ultimaAlerta ? $ultimaAlerta->tiempo_riesgo : $record->fecha->copy()->setHour(8)->addSeconds($record->tiempo_promedio_segundos);
             } else {
-                // Para modo manual, mantener la lógica actual
                 $record->tiempo_inicial = $record->fecha->copy()->setHour(8);
                 $record->tiempo_final = $record->fecha->copy()->setHour(8)->addSeconds($record->tiempo_promedio_segundos);
             }
@@ -123,47 +161,7 @@ class DetectionTimeController extends Controller
             return $record;
         });
 
-        // ═══════════════════════════════════════════════════════════════
-        // 🆕 OBTENER DATOS DE PRECISIÓN (VP/FP) DESDE ConsolidacionDiaria
-        // ═══════════════════════════════════════════════════════════════
-        $precisionData = [];
-
-        if ($isAllPlants) {
-            $plantaIds = $plantasGE->pluck('id');
-            $consolidaciones = \App\Models\ConsolidacionDiaria::whereIn('planta_id', $plantaIds)->get();
-        } elseif ($ubicacionSeleccionada) {
-            $consolidaciones = \App\Models\ConsolidacionDiaria::where('planta_id', $ubicacionSeleccionada->planta_id)->get();
-        } else {
-            $consolidaciones = collect();
-        }
-
-        foreach ($consolidaciones as $cons) {
-            $dateKey = Carbon::parse($cons->fecha_consolidacion)->format('Y-m-d');
-            
-            if (!isset($precisionData[$dateKey])) {
-                $precisionData[$dateKey] = [
-                    'vp' => 0,
-                    'fp' => 0,
-                    'fn' => 0,
-                    'n_precision' => 0,
-                    'pds_percentage' => 0,
-                ];
-            }
-            
-            $precisionData[$dateKey]['vp'] += $cons->vp ?? 0;
-            $precisionData[$dateKey]['fp'] += $cons->fp ?? 0;
-            $precisionData[$dateKey]['fn'] += $cons->fn ?? 0;
-            $precisionData[$dateKey]['n_precision'] = $precisionData[$dateKey]['vp'] + $precisionData[$dateKey]['fp'] + $precisionData[$dateKey]['fn'];
-            
-            $nTotal = $precisionData[$dateKey]['n_precision'];
-            $precisionData[$dateKey]['pds_percentage'] = $nTotal > 0 
-                ? round(($precisionData[$dateKey]['vp'] / $nTotal) * 100, 1) 
-                : 0;
-        }
-
-        // ═══════════════════════════════════════════════════════════════
-        // 📈 GRÁFICOS
-        // ═══════════════════════════════════════════════════════════════
+        // Gráficos
         $chartQuery = TiempoDeteccion::query();
 
         if ($isAllPlants) {
@@ -195,6 +193,39 @@ class DetectionTimeController extends Controller
         $manualCount = $chartRows->where('tipo_entrada', 'manual')->count();
         $automaticCount = $chartRows->where('tipo_entrada', 'automatico')->count();
 
+        // Datos de precisión
+        $precisionData = [];
+
+        if ($isAllPlants) {
+            $plantaIds = $plantasGE->pluck('id');
+            $consolidaciones = ConsolidacionDiaria::whereIn('planta_id', $plantaIds)->get();
+        } elseif ($ubicacionSeleccionada) {
+            $consolidaciones = ConsolidacionDiaria::where('planta_id', $ubicacionSeleccionada->planta_id)->get();
+        } else {
+            $consolidaciones = collect();
+        }
+
+        foreach ($consolidaciones as $cons) {
+            $dateKey = Carbon::parse($cons->fecha_consolidacion)->format('Y-m-d');
+            
+            if (!isset($precisionData[$dateKey])) {
+                $precisionData[$dateKey] = [
+                    'vp' => 0, 'fp' => 0, 'fn' => 0,
+                    'n_precision' => 0, 'pds_percentage' => 0,
+                ];
+            }
+            
+            $precisionData[$dateKey]['vp'] += $cons->vp ?? 0;
+            $precisionData[$dateKey]['fp'] += $cons->fp ?? 0;
+            $precisionData[$dateKey]['fn'] += $cons->fn ?? 0;
+            $precisionData[$dateKey]['n_precision'] = $precisionData[$dateKey]['vp'] + $precisionData[$dateKey]['fp'] + $precisionData[$dateKey]['fn'];
+            
+            $nTotal = $precisionData[$dateKey]['n_precision'];
+            $precisionData[$dateKey]['pds_percentage'] = $nTotal > 0 
+                ? round(($precisionData[$dateKey]['vp'] / $nTotal) * 100, 1) 
+                : 0;
+        }
+
         return view('dashboard.detection_time', [
             'plantasGC' => $plantasGC,
             'plantasGE' => $plantasGE,
@@ -215,64 +246,10 @@ class DetectionTimeController extends Controller
             'manualCount' => $manualCount,
             'automaticCount' => $automaticCount,
             'precisionData' => $precisionData,
+            'alertasPorDia' => $alertasPorDia,
         ]);
     }
 
-    /**
-     * Calcular el tiempo promedio de detección agrupado por día
-     */
-    private function calculateDetectionTimeByDay($alertas)
-    {
-        $groupedByDate = [];
-        foreach ($alertas as $alerta) {
-            $date = $alerta->tiempo_alerta->format('Y-m-d');
-            if (!isset($groupedByDate[$date])) {
-                $groupedByDate[$date] = [
-                    'alertas' => [],
-                    'suma_tiempos' => 0,
-                    'cantidad' => 0,
-                ];
-            }
-            $diferencia = abs($alerta->tiempo_riesgo->diffInSeconds($alerta->tiempo_alerta));
-            $groupedByDate[$date]['alertas'][] = [
-                'id' => $alerta->id,
-                'ubicacion_nombre' => $alerta->ubicacion->nombre ?? 'N/A',
-                'planta_nombre' => $alerta->ubicacion->planta->nombre ?? 'N/A',
-                'tiempo_alerta' => $alerta->tiempo_alerta,
-                'tiempo_riesgo' => $alerta->tiempo_riesgo,
-                'diferencia' => $diferencia,
-            ];
-            $groupedByDate[$date]['suma_tiempos'] += $diferencia;
-            $groupedByDate[$date]['cantidad'] += 1;
-        }
-
-        $result = [];
-        $dayNumber = 1;
-        foreach ($groupedByDate as $fecha => $data) {
-            $tiempoPromedio = $data['cantidad'] > 0
-                ? round($data['suma_tiempos'] / $data['cantidad'], 2)
-                : 0;
-            $primerRegistro = $data['alertas'][0];
-            $ultimoRegistro = end($data['alertas']);
-            $result[] = [
-                'numero' => $dayNumber,
-                'fecha' => $fecha,
-                'tiempo_inicial' => $primerRegistro['tiempo_alerta']->format('Y-m-d H:i:s'),
-                'tiempo_final' => $ultimoRegistro['tiempo_riesgo']->format('Y-m-d H:i:s'),
-                'subparcela' => $primerRegistro['ubicacion_nombre'],
-                'planta' => $primerRegistro['planta_nombre'],
-                'tiempo_promedio' => $tiempoPromedio,
-                'cantidad_eventos' => $data['cantidad'],
-                'detalles' => $data['alertas'],
-            ];
-            $dayNumber++;
-        }
-        return $result;
-    }
-
-    /**
-     * Exportar datos de tiempo de detección a CSV
-     */
     public function export(Request $request)
     {
         $location_id = $request->query('location_id');
@@ -280,13 +257,8 @@ class DetectionTimeController extends Controller
         $mode = $request->query('mode', 'manual');
         $isAllPlants = ($location_id === 'all');
 
-        // 🌳 CARGAR PLANTAS POR GRUPO
-        $plantasGC = Planta::where('grupo_experimental', 'control')
-            ->with('ubicaciones')
-            ->orderBy('numero_planta')->get();
-        $plantasGE = Planta::where('grupo_experimental', 'experimental')
-            ->with('ubicaciones')
-            ->orderBy('numero_planta')->get();
+        $plantasGC = Planta::where('grupo_experimental', 'control')->with('ubicaciones')->orderBy('numero_planta')->get();
+        $plantasGE = Planta::where('grupo_experimental', 'experimental')->with('ubicaciones')->orderBy('numero_planta')->get();
 
         $recordsQuery = TiempoDeteccion::with('ubicacion.planta');
 
@@ -322,23 +294,15 @@ class DetectionTimeController extends Controller
             $file = fopen('php://output', 'w');
             fprintf($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
             fputcsv($file, [
-                'Número (Día)',
-                'Fecha',
-                'Tiempo Inicial (Ti)',
-                'Tiempo Final (Tf)',
-                'Subparcela',
-                'Planta',
-                'Tiempo Promedio (segundos)',
-                'Cantidad de Eventos',
+                'Número (Día)', 'Fecha', 'Tiempo Inicial (Ti)', 'Tiempo Final (Tf)',
+                'Subparcela', 'Planta', 'Tiempo Promedio (segundos)', 'Cantidad de Eventos',
             ], ';');
             foreach ($detectionData as $day) {
                 fputcsv($file, [
-                    $day->id,
-                    $day->fecha->format('Y-m-d'),
+                    $day->id, $day->fecha->format('Y-m-d'),
                     $day->fecha->copy()->setHour(8)->format('Y-m-d H:i:s'),
                     $day->fecha->copy()->setHour(8)->addSeconds((int)$day->tiempo_promedio_segundos)->format('Y-m-d H:i:s'),
-                    $day->subparcela ?? 'N/A',
-                    $day->ubicacion->planta->nombre ?? 'N/A',
+                    $day->subparcela ?? 'N/A', $day->ubicacion->planta->nombre ?? 'N/A',
                     number_format((float)$day->tiempo_promedio_segundos, 2, '.', ''),
                     $day->cantidad_eventos,
                 ], ';');
@@ -347,91 +311,6 @@ class DetectionTimeController extends Controller
         }, 200, $headers);
     }
 
-    /**
-     * Guardar registros de TPD en la tabla tiempos_deteccion
-     */
-    private function saveDetectionTimeRecords($alertas)
-    {
-        if ($alertas->isEmpty()) {
-            return;
-        }
-
-        $groupedByDateAndLocation = [];
-        foreach ($alertas as $alerta) {
-            $date = $alerta->tiempo_alerta->format('Y-m-d');
-            $ubicacionId = $alerta->ubicacion_id;
-            $key = "$date|$ubicacionId";
-            if (!isset($groupedByDateAndLocation[$key])) {
-                $groupedByDateAndLocation[$key] = [
-                    'fecha' => $date,
-                    'ubicacion_id' => $ubicacionId,
-                    'planta_id' => $alerta->planta_id,
-                    'ubicacion' => $alerta->ubicacion,
-                    'alertas' => [],
-                    'subparcela' => $alerta->subparcela,
-                ];
-            } else {
-                if (empty($groupedByDateAndLocation[$key]['subparcela']) && !empty($alerta->subparcela)) {
-                    $groupedByDateAndLocation[$key]['subparcela'] = $alerta->subparcela;
-                }
-            }
-            $diferencia = abs($alerta->tiempo_riesgo->diffInSeconds($alerta->tiempo_alerta));
-            $groupedByDateAndLocation[$key]['alertas'][] = $diferencia;
-        }
-
-        foreach ($groupedByDateAndLocation as $record) {
-            $fecha = Carbon::parse($record['fecha']);
-            $tiempoPromedio = count($record['alertas']) > 0
-                ? round(array_sum($record['alertas']) / count($record['alertas']), 2)
-                : 0;
-            $tipoEntrada = $this->determinaTipoEntrada($record['ubicacion']);
-
-            TiempoDeteccion::updateOrCreate(
-                [
-                    'fecha' => $fecha,
-                    'ubicacion_id' => $record['ubicacion_id'],
-                ],
-                [
-                    'planta_id' => $record['planta_id'],
-                    'tiempo_promedio_segundos' => round($tiempoPromedio, 2),
-                    'cantidad_eventos' => count($record['alertas']),
-                    'suma_tiempos_segundos' => (int) array_sum($record['alertas']),
-                    'tipo_entrada' => $tipoEntrada,
-                    'subparcela' => $record['subparcela'],
-                ]
-            );
-        }
-    }
-
-    /**
-     * Determina si la entrada es manual o automática
-     */
-    private function determinaTipoEntrada($ubicacion)
-    {
-        if (!$ubicacion) {
-            return 'automatico';
-        }
-        $ubicacionNombre = strtolower($ubicacion->nombre);
-
-        if ($ubicacion->grupo_experimental === 'control' ||
-            strpos($ubicacionNombre, 'control') !== false ||
-            strpos($ubicacionNombre, 'manual') !== false) {
-            return 'manual';
-        }
-
-        if (strpos($ubicacionNombre, 'esp32') !== false ||
-            strpos($ubicacionNombre, 'automático') !== false ||
-            strpos($ubicacionNombre, 'iot') !== false ||
-            strpos($ubicacionNombre, 'experimental') !== false) {
-            return 'automatico';
-        }
-
-        return 'automatico';
-    }
-
-    /**
-     * Almacena un registro de tiempo ingresado manualmente
-     */
     public function storeManual(Request $request)
     {
         $request->validate([
@@ -454,57 +333,20 @@ class DetectionTimeController extends Controller
         $tarSeconds = abs($tf->diffInSeconds($ti));
         $cantidadEventos = (int) $request->cantidad_eventos;
 
-        // ✅ Crear o actualizar registro en tiempos_deteccion
         TiempoDeteccion::updateOrCreate(
-            [
-                'fecha' => $fecha,
-                'ubicacion_id' => $ubicacion->id,
-            ],
+            ['fecha' => $fecha, 'ubicacion_id' => $ubicacion->id],
             [
                 'planta_id' => $ubicacion->planta_id,
                 'tiempo_promedio_segundos' => $tarSeconds,
                 'cantidad_eventos' => $cantidadEventos,
                 'suma_tiempos_segundos' => $tarSeconds * $cantidadEventos,
                 'tipo_entrada' => 'manual',
-                'subparcela' => 'Manual', // Valor por defecto
+                'subparcela' => 'Manual',
             ]
         );
 
         return redirect()->route('detection_time', [
-            'location_id' => $ubicacion->id,
-            'mode' => 'manual',
-            'filter' => 'all'
+            'location_id' => $ubicacion->id, 'mode' => 'manual', 'filter' => 'all'
         ])->with('success', '✅ Registro manual guardado correctamente. TAR: ' . $tarSeconds . 's, Eventos: ' . $cantidadEventos);
-    }
-
-    /**
-     * Actualiza un registro de tiempo de detección manual
-     */
-    public function updateManual(Request $request, $recordId)
-    {
-        $request->validate([
-            'subparcela' => ['required', 'string', 'regex:/^[Ss]\d+$/'],
-            'fecha' => 'required|date',
-            'hora_alerta' => 'required',
-            'hora_evento' => 'required',
-        ]);
-
-        $record = TiempoDeteccion::findOrFail($recordId);
-
-        $fecha = $request->fecha;
-        $ti = Carbon::parse($fecha . ' ' . $request->hora_alerta);
-        $tf = Carbon::parse($fecha . ' ' . $request->hora_evento);
-        $tarSeconds = $tf->diffInSeconds($ti);
-
-        $record->update([
-            'fecha' => $fecha,
-            'subparcela' => strtoupper($request->subparcela),
-            'tiempo_promedio_segundos' => $tarSeconds,
-            'suma_tiempos_segundos' => $tarSeconds,
-            'cantidad_eventos' => 1,
-        ]);
-
-        return redirect()->route('detection_time', ['location_id' => $record->ubicacion_id])
-            ->with('success', '✅ Registro actualizado correctamente.');
     }
 }

@@ -15,7 +15,6 @@ use Illuminate\Support\Facades\DB;
 
 class AnalisisController extends Controller
 {
- 
     public function index(Request $request)
     {
         // ═══ UBICACIÓN SELECCIONADA ═══
@@ -262,6 +261,15 @@ class AnalisisController extends Controller
 
         $ubicacion = Ubicacion::findOrFail($request->ubicacion_id);
 
+        // Verificar si ya existe un registro para esta fecha y ubicación
+        $exists = RegistroPorcentajePerdida::where('ubicacion_id', $ubicacion->id)
+            ->whereDate('fecha_registro', $request->fecha_registro)
+            ->exists();
+
+        if ($exists) {
+            return back()->with('error', '❌ Ya existe un registro para esta fecha y ubicación');
+        }
+
         RegistroPorcentajePerdida::create([
             'ubicacion_id' => $ubicacion->id,
             'grupo_experimental' => $ubicacion->grupo_experimental ?? 'control',
@@ -284,16 +292,43 @@ class AnalisisController extends Controller
             'evaluation' => 'required|in:VP,FP',
         ]);
 
-        // Crear o actualizar evaluación
-        EvaluacionAlerta::updateOrCreate(
-            ['alerta_id' => $alerta->id],
-            [
-                'planta_id' => $alerta->planta_id,
+        // Verificar si la alerta ya fue evaluada
+        $exists = EvaluacionAlerta::where('alerta_id', $alerta->id)->exists();
+
+        if ($exists) {
+            if ($request->expectsJson() || $request->wantsJson()) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => '⚠️ Esta alerta ya fue evaluada previamente',
+                ], 422);
+            }
+            return redirect()->route('analisis', [
                 'ubicacion_id' => $alerta->ubicacion_id,
-                'etiqueta' => $request->evaluation,
-                'session_id' => session()->getId(),
-            ]
-        );
+            ])->with('error', '⚠️ Esta alerta ya fue evaluada previamente');
+        }
+
+        // Crear evaluación
+        EvaluacionAlerta::create([
+            'alerta_id'    => $alerta->id,
+            'planta_id'    => $alerta->planta_id,
+            'ubicacion_id' => $alerta->ubicacion_id,
+            'etiqueta'     => $request->evaluation,
+            'session_id'   => session()->getId(),
+        ]);
+
+        // Marcar alerta como resuelta
+        $alerta->update([
+            'resuelta'         => true,
+            'fecha_resolucion' => now(),
+            'estado'           => 'RESUELTA',
+            'notas_resolucion' => "Evaluada como {$request->evaluation}",
+        ]);
+
+        // Disparar cálculo de tiempo de detección si es VP
+        if ($request->evaluation === 'VP') {
+            $alerta->load('evaluacion');
+            \App\Jobs\CalcularTiempoDeteccion::dispatch($alerta);
+        }
 
         // Notificar a Telegram que la alerta ha sido evaluada
         try {
@@ -305,19 +340,29 @@ class AnalisisController extends Controller
             \Log::error('Error sending Telegram evaluation notification: ' . $e->getMessage());
         }
 
-        // Redirigir sin highlight_alert para evitar reapertura del modal
+        // ✅ Si es petición AJAX/fetch, responder con JSON para que el modal pueda cerrarse
+        if ($request->expectsJson() || $request->wantsJson()) {
+            return response()->json([
+                'status'     => 'success',
+                'message'    => "✅ Alerta evaluada como {$request->evaluation}",
+                'alerta_id'  => $alerta->id,
+                'evaluation' => $request->evaluation,
+            ]);
+        }
+
+        // Para formularios normales: redirigir
         return redirect()->route('analisis', [
             'ubicacion_id' => $alerta->ubicacion_id,
         ])->with('success', "✅ Alerta evaluada como {$request->evaluation}");
     }
 
-   // ═══ MÉTODO: CERRAR DÍA Y CONSOLIDAR EVALUACIONES ═══
+    // ═══ MÉTODO: CERRAR DÍA Y CONSOLIDAR EVALUACIONES ═══
     public function cerrarDia(Request $request)
     {
         $today = now()->toDateString();
         
-        // ✅ Obtener ubicación desde la sesión o request
-        $ubicacionId = $request->query('ubicacion_id') ?? session('agro_loc');
+        // ✅ Obtener ubicación desde el request (POST) o sesión
+        $ubicacionId = $request->input('ubicacion_id') ?? session('agro_loc');
         $ubicacion = $ubicacionId ? Ubicacion::find($ubicacionId) : null;
 
         if (!$ubicacion) {
@@ -348,14 +393,14 @@ class AnalisisController extends Controller
         $fp = $evaluations->where('etiqueta', 'FP')->count();
         $total = $vp + $fp;
 
-        $pdsPercentage = $total > 0 ? round(($vp / $total) * 100, 2) : 0;
-
         if ($total === 0) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'No hay evaluaciones para esta planta hoy. Evalúa al menos una alerta antes de cerrar el día.'
             ], 400);
         }
+
+        $pdsPercentage = round(($vp / $total) * 100, 2);
 
         // Consolidar para esta planta específica
         ConsolidacionDiaria::create([
@@ -368,9 +413,28 @@ class AnalisisController extends Controller
             'fecha_cierre' => now(),
         ]);
 
+        // ✅ LÓGICA NUEVA: Si se cierra el día, TODAS las alertas abiertas de esta planta para hoy,
+        // se marcan automáticamente como "RESUELTA" para congelar su TPD y evitar que sigan
+        // corriendo para el día siguiente. Quedan como "Sin evaluar" pero cerradas.
+        $alertasActualizadas = \App\Models\Alerta::whereDate('tiempo_alerta', $today)
+            ->where('ubicacion_id', $ubicacion->id)
+            ->where('resuelta', false)
+            ->update([
+                'resuelta' => true,
+                'estado' => 'RESUELTA',
+                'fecha_resolucion' => now(),
+                'notas_resolucion' => 'Auto-resuelta por cierre de día (Sin evaluar)'
+            ]);
+
         return response()->json([
             'status' => 'success',
-            'message' => "Día cerrado para {$ubicacion->planta->nombre} N°{$ubicacion->planta->numero_planta}. PDS%: {$pdsPercentage}% (VP: {$vp}, FP: {$fp})"
+            'message' => "Día cerrado para {$ubicacion->planta->nombre} N°{$ubicacion->planta->numero_planta}. PDS%: {$pdsPercentage}% (VP: {$vp}, FP: {$fp})",
+            'data' => [
+                'vp' => $vp,
+                'fp' => $fp,
+                'total' => $total,
+                'pds_percentage' => $pdsPercentage
+            ]
         ]);
     }
 
@@ -378,6 +442,13 @@ class AnalisisController extends Controller
     public function ubicacionesDisponibles(Request $request)
     {
         $fecha = $request->input('fecha', now()->toDateString());
+        
+        // Validar formato de fecha
+        if (!\DateTime::createFromFormat('Y-m-d', $fecha)) {
+            return response()->json([
+                'error' => 'Formato de fecha inválido. Use YYYY-MM-DD'
+            ], 400);
+        }
         
         // Obtener todas las ubicaciones del Grupo Control
         $todasUbicaciones = Ubicacion::with('planta')
@@ -408,9 +479,11 @@ class AnalisisController extends Controller
             'fecha' => $fecha
         ]);
     }
+
     // ═══ MÉTODO: EXPORTAR ═══
     public function export()
     {
+        // TODO: Implementar exportación a Excel/CSV
         return back()->with('success', 'Exportación iniciada');
     }
 }

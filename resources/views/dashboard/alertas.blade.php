@@ -265,6 +265,28 @@
         letter-spacing: 0.05em;
     }
     .btn-eval:hover { background: #4338ca; transform: scale(1.05); }
+
+    /* ── Modal Evaluación ── */
+    .eval-option {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1.2rem 1.4rem;
+        border-radius: 14px;
+        border: 2px solid #e5e7eb;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: #f9fafb;
+    }
+    .eval-option:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    .eval-option.vp { border-color: #86efac; }
+    .eval-option.vp:hover, .eval-option.vp.selected { background: #dcfce7; border-color: #16a34a; }
+    .eval-option.fp { border-color: #fca5a5; }
+    .eval-option.fp:hover, .eval-option.fp.selected { background: #fee2e2; border-color: #dc2626; }
+    .eval-option .eval-icon { font-size: 2rem; }
+    .eval-option .eval-label { font-weight: 800; font-size: 1rem; }
+    .eval-option .eval-desc  { font-size: 0.78rem; color: #6b7280; margin-top: 2px; }
+    .eval-option.selected .eval-desc { color: inherit; }
 </style>
 
 {{-- ═══════════════════════════════════════════════════════════════════════════
@@ -451,6 +473,63 @@
         </div>
     </div>
 </div>
+
+<!-- ══════════════════════════════════════════════════════════
+     🎓 Modal Evaluación VP / FP
+     ══════════════════════════════════════════════════════════ -->
+<div id="modalEval" class="modal-overlay" style="display:none;">
+    <div class="modal-content" style="max-width:480px;">
+        <div class="modal-header" style="margin-bottom:0.5rem;">
+            <h2 style="font-size:1.15rem;">🎓 Evaluar Alerta</h2>
+            <button onclick="closeEval()" style="padding:0; border:none; background:transparent; cursor:pointer; color:#9ca3af; font-size:1.2rem;"><i class="fas fa-times"></i></button>
+        </div>
+        <p style="font-size:0.82rem; color:#6b7280; margin-bottom:1.4rem;">Indica si esta alerta correspondió a un evento <strong>real de lixiviación</strong> o fue una <strong>falsa alarma</strong>.</p>
+
+        <div id="eval-alert-info" style="background:#f3f4f6; border-radius:10px; padding:0.8rem 1rem; margin-bottom:1.4rem; font-size:0.82rem; color:#374151;">
+            <!-- Se llena dinámicamente -->
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:0.75rem; margin-bottom:1.5rem;">
+            <div class="eval-option vp" id="eval-vp" onclick="selectEval('VP')">
+                <div class="eval-icon">✅</div>
+                <div>
+                    <div class="eval-label" style="color:#15803d;">VP — Verdadero Positivo</div>
+                    <div class="eval-desc">La alerta fue correcta. Hubo lixiviación real en campo.</div>
+                </div>
+            </div>
+            <div class="eval-option fp" id="eval-fp" onclick="selectEval('FP')">
+                <div class="eval-icon">❌</div>
+                <div>
+                    <div class="eval-label" style="color:#dc2626;">FP — Falso Positivo</div>
+                    <div class="eval-desc">La alerta fue incorrecta. No hubo lixiviación real.</div>
+                </div>
+            </div>
+        </div>
+
+        <input type="hidden" id="eval-alert-id" value="">
+        <input type="hidden" id="eval-selected" value="">
+
+        <div style="display:flex; gap:10px;">
+            <button id="btn-submit-eval"
+                onclick="submitEval()"
+                style="flex:1; padding:0.75rem; border-radius:12px; font-weight:700; font-size:0.9rem;
+                       background:var(--accent-indigo); color:white; border:none; cursor:pointer;
+                       transition:all 0.2s; opacity:0.5; pointer-events:none;"
+                disabled>
+                <i class="fas fa-check"></i> Confirmar Evaluación
+            </button>
+            <button onclick="closeEval()"
+                style="padding:0.75rem 1.2rem; border-radius:12px; font-weight:700; font-size:0.9rem;
+                       background:#f3f4f6; color:#374151; border:1px solid #e5e7eb; cursor:pointer;">
+                Cancelar
+            </button>
+        </div>
+
+        <div id="eval-error" style="display:none; margin-top:0.75rem; padding:0.6rem 1rem;
+             background:#fee2e2; border-radius:8px; color:#dc2626; font-size:0.82rem; font-weight:600;">
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('scripts')
@@ -510,7 +589,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     loadAlerts();
-    setInterval(loadAlerts, 60000);
+    setInterval(loadAlerts, 10000);
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -605,14 +684,36 @@ function renderAlerts(alerts) {
 
         const nivelTipo = (a.analysis && a.analysis.ilx_estado) ? a.analysis.ilx_estado : (a.type || 'N/A');
 
-        let tpdSeconds = null;
-        if (a.tiempo_alerta && a.tiempo_riesgo) {
-            try {
-                const ta = new Date(a.tiempo_alerta);
-                const tr = new Date(a.tiempo_riesgo);
-                tpdSeconds = Math.abs(Math.round((tr.getTime() - ta.getTime()) / 1000));
-            } catch(e) {
-                tpdSeconds = null;
+        // ── TPD: Tiempo de Detección / Tiempo de Respuesta ──
+        // • Alerta RESUELTA + evaluada VP → tar real del Job
+        // • Alerta RESUELTA sin tar → fecha_resolucion - tiempo_alerta
+        // • Alerta ABIERTA → tiempo transcurrido desde tiempo_alerta (en vivo)
+        let tpdSeconds  = null;
+        let tpdIsLive   = false;
+        let tpdLabel    = 'TAR';
+
+        if (a.is_resolved) {
+            // Usar tar solo si fue calculado por el Job (VP) y es razonable (> 0, no 300 hardcodeado)
+            if (a.tar && a.tar > 0 && a.tar !== 300) {
+                tpdSeconds = parseInt(a.tar);
+                tpdLabel   = 'TAR';
+            } else if (a.fecha_resolucion && a.tiempo_alerta) {
+                try {
+                    const ta   = new Date(a.tiempo_alerta);
+                    const tr   = new Date(a.fecha_resolucion);
+                    const diff = tr.getTime() - ta.getTime();
+                    if (diff > 0) { tpdSeconds = Math.round(diff / 1000); tpdLabel = 'Duración'; }
+                } catch(e) { tpdSeconds = null; }
+            }
+        } else {
+            // Alerta ABIERTA → tiempo desde tiempo_alerta hasta ahora
+            if (a.tiempo_alerta) {
+                try {
+                    const ta   = new Date(a.tiempo_alerta);
+                    const now  = new Date();
+                    const diff = now.getTime() - ta.getTime();
+                    if (diff > 0) { tpdSeconds = Math.round(diff / 1000); tpdIsLive = true; tpdLabel = 'En curso'; }
+                } catch(e) { tpdSeconds = null; }
             }
         }
 
@@ -620,9 +721,16 @@ function renderAlerts(alerts) {
             ? `${a.ubicacion.planta.nombre} (Planta ${a.ubicacion.planta.numero_planta || a.ubicacion.planta.id})`
             : (a.subparcela || 'N/D');
         
-        const evalBadge = a.evaluation 
-            ? `<span class="badge badge-eval">${a.evaluation.label}</span>`
-            : `<button onclick="goToEval(${a.id}, ${a.ubicacion_id})" class="btn-eval"><i class="fas fa-graduation-cap"></i> Evaluar</button>`;
+        let evalBadge = '';
+        if (a.evaluation) {
+            if (a.evaluation.etiqueta === 'VP') {
+                evalBadge = `<span class="badge" style="background:#dcfce7; color:#166534; border:1px solid #bbf7d0;">✔ VP</span>`;
+            } else {
+                evalBadge = `<span class="badge" style="background:#fee2e2; color:#991b1b; border:1px solid #fecaca;">❌ FP</span>`;
+            }
+        } else {
+            evalBadge = `<button onclick="goToEval(${a.id}, ${a.ubicacion_id})" class="btn-eval"><i class="fas fa-graduation-cap"></i> Evaluar</button>`;
+        }
 
         const resolveBtn = isOpen && a.evaluation
             ? `<button onclick="resolveAlertNow(${a.id})" class="btn btn-sm btn-outline-success" style="border-radius:8px; font-size:0.7rem; font-weight:700;">
@@ -644,8 +752,11 @@ function renderAlerts(alerts) {
                     <span class="badge ${rClass}"><i class="fas ${rIcon}"></i> ${risk}</span>
                 </td>
                 <td>
-                    <div style="font-weight:800; color:#16a34a; font-family:monospace;">
-                        ${tpdSeconds !== null ? tpdSeconds + 's' : '--'}
+                    <div style="font-size:0.65rem; color:#9ca3af; margin-bottom:2px; text-transform:uppercase; letter-spacing:0.04em;">
+                        ${tpdIsLive ? '<span style="color:#f59e0b;">⏱</span> ' : ''}${tpdLabel}
+                    </div>
+                    <div style="font-weight:800; color:${tpdIsLive ? '#f59e0b' : '#16a34a'}; font-family:monospace; font-size:1rem;">
+                        ${tpdSeconds !== null ? tpdSeconds + 's' : '—'}
                     </div>
                     ${tpdSeconds !== null ? `<div style="font-size:0.7rem; color:#9ca3af;">(~${(tpdSeconds/60).toFixed(1)} min)</div>` : ''}
                 </td>
@@ -670,6 +781,9 @@ function renderAlerts(alerts) {
     }
 }
 
+// ══════════════════════════════════════════════
+// 🎓 EVALUAR — redirige a analisis.blade.php donde está el modal VP/FP
+// ══════════════════════════════════════════════
 function goToEval(alertId, alertLocId) {
     if (alertLocId) {
         localStorage.setItem('agro_loc', alertLocId);
@@ -680,6 +794,54 @@ function goToEval(alertId, alertLocId) {
     }
     window.location.href = url;
 }
+
+// Funciones del modal de evaluación (modalEval en el HTML)
+let _evalSelected = null;
+
+function closeEval() {
+    document.getElementById('modalEval').style.display = 'none';
+}
+
+function selectEval(value) {
+    _evalSelected = value;
+    document.getElementById('eval-vp').classList.toggle('selected', value === 'VP');
+    document.getElementById('eval-fp').classList.toggle('selected', value === 'FP');
+    const btnSubmit = document.getElementById('btn-submit-eval');
+    btnSubmit.disabled = false;
+    btnSubmit.style.opacity = '1';
+    btnSubmit.style.pointerEvents = 'auto';
+}
+
+async function submitEval() {
+    const alertId  = document.getElementById('eval-alert-id').value;
+    if (!_evalSelected) { return; }
+    const btn = document.getElementById('btn-submit-eval');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+    try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+        const res  = await fetch(`/analisis/evaluar-alerta/${alertId}`, {
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ evaluation: _evalSelected }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (res.ok && json.status === 'success') {
+            closeEval();
+            loadAlerts();
+        } else {
+            const errEl = document.getElementById('eval-error');
+            errEl.textContent = json.message || 'Error al evaluar. Intenta de nuevo.';
+            errEl.style.display = 'block';
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-check"></i> Confirmar Evaluación';
+        }
+    } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check"></i> Confirmar Evaluación';
+    }
+}
+
 
 async function resolveAlertNow(id) {
     if(!confirm('¿Marcar esta alerta como resuelta?')) return;

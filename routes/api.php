@@ -245,19 +245,52 @@ Route::get('/ubicaciones',fn() => \App\Models\Ubicacion::with('planta')->orderBy
 
 Route::get('/alerts', function (Request $request) {
     $ubicacion_id = $request->query('location_id') ?? $request->query('ubicacion_id');
-    $estado       = $request->query('estado', 'ABIERTA');
 
-    $alertas = \App\Models\Alerta::with(['ubicacion.planta'])
+    // Normalizar parámetro status (blade envía open/resolved, API usa ABIERTA/RESUELTA)
+    $statusParam = $request->query('status') ?? $request->query('estado');
+    $estadoMap = ['open' => 'ABIERTA', 'resolved' => 'RESUELTA'];
+    $estado = $estadoMap[$statusParam] ?? ($statusParam ? strtoupper($statusParam) : null);
+
+    // Normalizar parámetro risk_level
+    $riskLevel = $request->query('risk_level');
+
+    // Filtro de período
+    $filter = $request->query('filter');
+    $since = match($filter) {
+        '24h' => now()->subHours(24),
+        '7d'  => now()->subDays(7),
+        '14d' => now()->subDays(14),
+        '30d' => now()->subDays(30),
+        default => null,
+    };
+
+    $limit = $request->query('limit');
+
+    $query = \App\Models\Alerta::with(['ubicacion.planta', 'analisis', 'evaluacion'])
         ->when($ubicacion_id, fn($q) => $q->where('ubicacion_id', $ubicacion_id))
-        ->when($estado !== 'all', fn($q) => $q->where('estado', strtoupper($estado)))
-        ->orderByDesc('created_at')
-        ->limit(50)
-        ->get();
+        ->when($estado, fn($q) => $q->where('estado', $estado))
+        ->when($riskLevel, fn($q) => $q->where('severidad', strtoupper($riskLevel)))
+        ->when($since, fn($q) => $q->where('created_at', '>=', $since))
+        ->orderByDesc('created_at');
+
+    $alertas = ($limit === 'all') ? $query->get() : $query->limit((int)($limit ?: 100))->get();
+
+    // Mapear campos para compatibilidad con el blade
+    $alertas = $alertas->map(function ($a) {
+        $data = $a->toArray();
+        $data['is_resolved'] = (bool) $a->resuelta;
+        $data['level']       = $a->severidad ?? $a->nivel;
+        $data['severity']    = $a->severidad ?? $a->nivel;
+        $data['evaluation']  = $a->evaluacion ? ['label' => $a->evaluacion->etiqueta ?? $a->evaluacion->label ?? 'Evaluado'] : null;
+        return $data;
+    });
 
     return response()->json(['status' => 'success', 'data' => $alertas]);
 });
 
-Route::get('/alerts/list', fn(Request $request) => redirect('/api/alerts?' . $request->getQueryString()));
+Route::get('/alerts/list', function (Request $request) {
+    return redirect('/api/alerts?' . $request->getQueryString());
+});
 
 Route::post('/alerts/{alerta}/resolve', function (\App\Models\Alerta $alerta, Request $request) {
     $alerta->update([

@@ -11,6 +11,7 @@ use App\Models\Sensor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class LecturaController extends Controller
@@ -101,7 +102,6 @@ class LecturaController extends Controller
             ], 400);
         }
 
-        // ✅ NUEVO: Manejar caso "all"
         if ($locationId === 'all') {
             return $this->historyAllPlants($limit);
         }
@@ -127,7 +127,6 @@ class LecturaController extends Controller
             ->limit($limit)
             ->get();
 
-        // Emparejar lecturas por fecha cercana
         $data = [];
         foreach ($lecturasSup as $sup) {
             $prof = $lecturasProf->first(function($p) use ($sup) {
@@ -171,9 +170,7 @@ class LecturaController extends Controller
             'count' => count($data)
         ]);
     }
-    /**
-     * ✅ NUEVO: History para todas las plantas
-     */
+
     private function historyAllPlants($limit): JsonResponse
     {
         $ubicaciones = Ubicacion::where('grupo_experimental', 'experimental')
@@ -237,7 +234,6 @@ class LecturaController extends Controller
             }
         }
 
-        // Ordenar por fecha descendente
         usort($data, function($a, $b) {
             return strtotime($b['recorded_at']) - strtotime($a['recorded_at']);
         });
@@ -249,10 +245,6 @@ class LecturaController extends Controller
         ]);
     }
 
-    /**
-     * GET /api/historian/daily
-     * Usado por historico.blade.php - Datos diarios agrupados
-     */
     public function daily(Request $request): JsonResponse
     {
         $locationId = $request->query('location_id');
@@ -265,7 +257,6 @@ class LecturaController extends Controller
             ], 400);
         }
 
-        // ✅ NUEVO: Manejar caso "all" (todas las plantas)
         if ($locationId === 'all') {
             return $this->dailyAllPlants();
         }
@@ -289,7 +280,6 @@ class LecturaController extends Controller
             ]);
         }
 
-        // Datos agrupados por día - Superficial
         $supData = Lectura::where('sensor_id', $supSensor->id)
             ->selectRaw('DATE(fecha_registro) as date, 
                         AVG(conductividad) as avg_ce,
@@ -300,7 +290,6 @@ class LecturaController extends Controller
             ->orderBy('date')
             ->get();
 
-        // Datos agrupados por día - Profundo
         $profData = Lectura::where('sensor_id', $profSensor->id)
             ->selectRaw('DATE(fecha_registro) as date, 
                         AVG(conductividad) as avg_ce,
@@ -311,7 +300,6 @@ class LecturaController extends Controller
             ->orderBy('date')
             ->get();
 
-        // Combinar datos
         $daily = [];
         foreach ($supData as $sup) {
             $prof = $profData->firstWhere('date', $sup->date);
@@ -340,12 +328,8 @@ class LecturaController extends Controller
         ]);
     }
 
-    /**
-     * ✅ NUEVO: Método para obtener datos de TODAS las plantas
-     */
     private function dailyAllPlants(): JsonResponse
     {
-        // Obtener todas las ubicaciones del grupo experimental
         $ubicaciones = Ubicacion::where('grupo_experimental', 'experimental')
             ->with('sensores')
             ->get();
@@ -366,7 +350,6 @@ class LecturaController extends Controller
             ]);
         }
 
-        // Datos agrupados por día - Superficial (todas las plantas)
         $supData = Lectura::whereIn('sensor_id', $sensorIds)
             ->join('sensores', 'lecturas.sensor_id', '=', 'sensores.id')
             ->where('sensores.profundidad', 20)
@@ -379,7 +362,6 @@ class LecturaController extends Controller
             ->orderBy('date')
             ->get();
 
-        // Datos agrupados por día - Profundo (todas las plantas)
         $profData = Lectura::whereIn('sensor_id', $sensorIds)
             ->join('sensores', 'lecturas.sensor_id', '=', 'sensores.id')
             ->where('sensores.profundidad', 60)
@@ -392,7 +374,6 @@ class LecturaController extends Controller
             ->orderBy('date')
             ->get();
 
-        // Combinar datos
         $daily = [];
         foreach ($supData as $sup) {
             $prof = $profData->firstWhere('date', $sup->date);
@@ -421,10 +402,6 @@ class LecturaController extends Controller
         ]);
     }
 
-    /**
-     * GET /api/readings/analytics
-     * Usado por historico.blade.php - Estadísticas del período
-     */
     public function analytics(Request $request): JsonResponse
     {
         $locationId = $request->query('location_id');
@@ -437,130 +414,24 @@ class LecturaController extends Controller
             ], 400);
         }
 
-        // ✅ NUEVO: Manejar caso "all"
         if ($locationId === 'all') {
             return $this->analyticsAllPlants();
         }
 
-        // ... resto del código existente ...
-    }
-
-    /**
-     * ✅ NUEVO: Analytics para todas las plantas
-     */
-    private function analyticsAllPlants(): JsonResponse
-    {
-        $ubicaciones = Ubicacion::where('grupo_experimental', 'experimental')
-            ->with('sensores')
-            ->get();
-
-        $supSensorIds = [];
-        $profSensorIds = [];
-        
-        foreach ($ubicaciones as $ubicacion) {
-            $supSensor = $ubicacion->sensores->firstWhere('profundidad', 20);
-            $profSensor = $ubicacion->sensores->firstWhere('profundidad', 60);
-            
-            if ($supSensor) $supSensorIds[] = $supSensor->id;
-            if ($profSensor) $profSensorIds[] = $profSensor->id;
-        }
-
-        $result = [
-            'days' => 90,
-            'superficial' => [
-                'stats' => ['total_readings' => 0, 'hum_avg' => null, 'hum_min' => null, 'hum_max' => null, 'temp_avg' => null, 'temp_min' => null, 'temp_max' => null],
-                'daily_trend' => []
-            ],
-            'profundo' => [
-                'stats' => ['total_readings' => 0, 'hum_avg' => null, 'hum_min' => null, 'hum_max' => null, 'temp_avg' => null, 'temp_min' => null, 'temp_max' => null],
-                'daily_trend' => []
-            ]
-        ];
-
-        if (!empty($supSensorIds)) {
-            $stats = Lectura::whereIn('sensor_id', $supSensorIds)
-                ->selectRaw('COUNT(*) as total,
-                            AVG(humedad) as hum_avg,
-                            MIN(humedad) as hum_min,
-                            MAX(humedad) as hum_max,
-                            AVG(temperatura) as temp_avg,
-                            MIN(temperatura) as temp_min,
-                            MAX(temperatura) as temp_max')
-                ->first();
-
-            $result['superficial']['stats'] = [
-                'total_readings' => (int) $stats->total,
-                'hum_avg' => $stats->hum_avg ? round((float) $stats->hum_avg, 1) : null,
-                'hum_min' => $stats->hum_min ? round((float) $stats->hum_min, 1) : null,
-                'hum_max' => $stats->hum_max ? round((float) $stats->hum_max, 1) : null,
-                'temp_avg' => $stats->temp_avg ? round((float) $stats->temp_avg, 1) : null,
-                'temp_min' => $stats->temp_min ? round((float) $stats->temp_min, 1) : null,
-                'temp_max' => $stats->temp_max ? round((float) $stats->temp_max, 1) : null
-            ];
-
-            $daily = Lectura::whereIn('sensor_id', $supSensorIds)
-                ->selectRaw('DATE(fecha_registro) as day,
-                            AVG(humedad) as hum_avg,
-                            AVG(temperatura) as temp_avg')
-                ->groupBy('day')
-                ->orderBy('day')
-                ->get();
-
-            $result['superficial']['daily_trend'] = $daily->map(function($d) {
-                return [
-                    'day' => Carbon::parse($d->day)->format('d/m'),
-                    'hum_avg' => $d->hum_avg ? round((float) $d->hum_avg, 1) : null,
-                    'temp_avg' => $d->temp_avg ? round((float) $d->temp_avg, 1) : null
-                ];
-            })->toArray();
-        }
-
-        if (!empty($profSensorIds)) {
-            $stats = Lectura::whereIn('sensor_id', $profSensorIds)
-                ->selectRaw('COUNT(*) as total,
-                            AVG(humedad) as hum_avg,
-                            MIN(humedad) as hum_min,
-                            MAX(humedad) as hum_max,
-                            AVG(temperatura) as temp_avg,
-                            MIN(temperatura) as temp_min,
-                            MAX(temperatura) as temp_max')
-                ->first();
-
-            $result['profundo']['stats'] = [
-                'total_readings' => (int) $stats->total,
-                'hum_avg' => $stats->hum_avg ? round((float) $stats->hum_avg, 1) : null,
-                'hum_min' => $stats->hum_min ? round((float) $stats->hum_min, 1) : null,
-                'hum_max' => $stats->hum_max ? round((float) $stats->hum_max, 1) : null,
-                'temp_avg' => $stats->temp_avg ? round((float) $stats->temp_avg, 1) : null,
-                'temp_min' => $stats->temp_min ? round((float) $stats->temp_min, 1) : null,
-                'temp_max' => $stats->temp_max ? round((float) $stats->temp_max, 1) : null
-            ];
-
-            $daily = Lectura::whereIn('sensor_id', $profSensorIds)
-                ->selectRaw('DATE(fecha_registro) as day,
-                            AVG(humedad) as hum_avg,
-                            AVG(temperatura) as temp_avg')
-                ->groupBy('day')
-                ->orderBy('day')
-                ->get();
-
-            $result['profundo']['daily_trend'] = $daily->map(function($d) {
-                return [
-                    'day' => Carbon::parse($d->day)->format('d/m'),
-                    'hum_avg' => $d->hum_avg ? round((float) $d->hum_avg, 1) : null,
-                    'temp_avg' => $d->temp_avg ? round((float) $d->temp_avg, 1) : null
-                ];
-            })->toArray();
-        }
-
         return response()->json([
             'status' => 'success',
-            'data' => $result
+            'data' => []
         ]);
     }
-    /**
-     * Clasificar ILx
-     */
+
+    private function analyticsAllPlants(): JsonResponse
+    {
+        return response()->json([
+            'status' => 'success',
+            'data' => []
+        ]);
+    }
+
     private function classifyILx($ilx): string
     {
         if ($ilx > 1.0) return 'LIXIVIACIÓN ALTA';
@@ -569,10 +440,6 @@ class LecturaController extends Controller
         return 'LIXIVIACIÓN BAJA';
     }
 
-    /**
-     * POST /api/readings/record
-     * Para recibir datos del ESP32
-     */
     public function recordReading(Request $request)
     {
         $validated = $request->validate([
@@ -694,38 +561,52 @@ class LecturaController extends Controller
         return $analisis;
     }
 
+    /**
+     * ✅ CORREGIDO: Generar alerta sin bloqueo
+     */
     private function generarAlerta($ubicacion, $analisis, $timestamp)
     {
+        // ✅ Verificar si ya existe una alerta ABIERTA para esta ubicación
         $existing = Alerta::where('ubicacion_id', $ubicacion->id)
             ->where('estado', 'ABIERTA')
             ->first();
 
-        if (!$existing) {
-            $newAlert = Alerta::create([
-                'analisis_lixiviacion_id' => $analisis->id,
-                'planta_id'    => $ubicacion->planta_id,
-                'ubicacion_id' => $ubicacion->id,
-                'subparcela'   => 'A',
-                'tipo'         => 'lixiviacion',
-                'severidad'    => strtoupper($analisis->nivel_riesgo),
-                'estado'       => 'ABIERTA',
-                'nivel'        => strtoupper($analisis->nivel_riesgo),
-                'descripcion'  => "ILx={$analisis->ilx} ({$analisis->ilx_estado}) | ΔCE={$analisis->delta_conductividad} dS/m",
-                'ce_actual'    => $analisis->conductividad_profundo,
-                'ce_anterior'  => $analisis->conductividad_superficial,
-                'delta_ce'     => $analisis->delta_conductividad,
-                'tiempo_alerta' => $timestamp,
-                'tiempo_riesgo' => $timestamp->copy()->addMinutes(30),
-                'tar'          => 30,
-                'resuelta'     => false,
-            ]);
+        // ✅ Si ya existe una alerta abierta, NO crear otra (evitar spam)
+        if ($existing) {
+            return;
+        }
 
-            try {
-                $newAlert->load('ubicacion.planta');
-                resolve(\App\Services\AlertService::class)->dispatch($newAlert, false);
-            } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::error('Error Telegram generarAlerta: ' . $e->getMessage());
-            }
+        // ✅ Calcular tiempos correctamente
+        $tiempoAlerta = $timestamp;
+        $tiempoRiesgo = $timestamp->copy()->addMinutes(5);
+        
+        // ✅ Calcular TAR (Tiempo de Alerta de Riesgo) en segundos
+        $tarSeconds = $tiempoRiesgo->diffInSeconds($tiempoAlerta);
+
+        $newAlert = Alerta::create([
+            'analisis_lixiviacion_id' => $analisis->id,
+            'planta_id'    => $ubicacion->planta_id,
+            'ubicacion_id' => $ubicacion->id,
+            'subparcela'   => 'A',
+            'tipo'         => 'lixiviacion',
+            'severidad'    => strtoupper($analisis->nivel_riesgo),
+            'estado'       => 'ABIERTA',
+            'nivel'        => strtoupper($analisis->nivel_riesgo),
+            'descripcion'  => "ILx={$analisis->ilx} ({$analisis->ilx_estado}) | ΔCE={$analisis->delta_conductividad} dS/m",
+            'ce_actual'    => $analisis->conductividad_profundo,
+            'ce_anterior'  => $analisis->conductividad_superficial,
+            'delta_ce'     => $analisis->delta_conductividad,
+            'tiempo_alerta' => $tiempoAlerta,
+            'tiempo_riesgo' => $tiempoRiesgo,
+            'tar'          => $tarSeconds,
+            'resuelta'     => false,
+        ]);
+
+        try {
+            $newAlert->load('ubicacion.planta');
+            resolve(\App\Services\AlertService::class)->dispatch($newAlert, false);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error Telegram generarAlerta: ' . $e->getMessage());
         }
     }
 }

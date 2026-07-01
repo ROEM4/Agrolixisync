@@ -18,14 +18,15 @@ class AlertService
     {
         try {
             if (!$this->shouldNotify($alert)) {
+                Log::info("AlertService: No se debe notificar la alerta #{$alert->id}");
                 return false;
             }
 
+            Log::info("AlertService: Enviando alerta #{$alert->id} a Telegram");
             $message = $this->buildMessage($alert, $isUpdate);
             $buttons = $this->buildButtons($alert);
-
+            
             return $this->telegram->sendMessageWithButtons($message, $buttons);
-
         } catch (\Throwable $e) {
             Log::error('AlertService dispatch error: ' . $e->getMessage());
             return false;
@@ -54,20 +55,27 @@ class AlertService
             return true;
         }
 
-        // Mapear nivel de alerta a clave de configuración de alertas.blade.php
+        // ✅ CORRECCIÓN: Normalizar claves (quitar espacios)
+        $normalizedSettings = [];
+        foreach ($settings as $key => $value) {
+            $normalizedSettings[trim($key)] = $value;
+        }
+
+        // Mapear nivel de alerta a clave de configuración
         $severity = strtoupper($alert->severidad ?? $alert->nivel ?? '');
         $key = match ($severity) {
-            'ALTO', 'ALTA'            => 'lixiviacion_alta',
-            'MEDIO', 'MEDIA'          => 'lixiviacion_media',
-            'BAJO', 'BAJA'            => 'lixiviacion_baja',
-            default                   => null,
+            'ALTO', 'ALTA'   => 'lixiviacion_alta',
+            'MEDIO', 'MEDIA' => 'lixiviacion_media',
+            'BAJO', 'BAJA'   => 'lixiviacion_baja',
+            default          => null,
         };
 
         if ($key === null) {
             return true;
         }
 
-        return $settings[$key] ?? false;
+        // ✅ CORRECCIÓN: Si la clave no existe, notificar por defecto (true en vez de false)
+        return $normalizedSettings[$key] ?? true;
     }
 
     /**
@@ -84,21 +92,29 @@ class AlertService
     }
 
     /**
-     * Evitar spam básico (misma alerta en corto tiempo)
+     * ✅ CORREGIDO: Evitar spam básico usando tiempo_alerta como referencia de última notificación
+     * (tiempo_alerta se actualiza cada vez que se envía una notificación exitosa)
      */
     private function wasRecentlySent(Alerta $alert): bool
     {
-        // Para alertas nuevas (recién creadas) siempre notificar
-        if ($alert->wasRecentlyCreated ?? false) {
+        if (!$alert->created_at) {
             return false;
         }
 
-        // Anti-spam: no reenviar si se actualizó hace menos de 5 minutos
-        if (!$alert->updated_at) {
+        // Si la alerta fue creada hace menos de 30 segundos, siempre es nueva
+        if ($alert->created_at->diffInSeconds(now()) < 30) {
             return false;
         }
 
-        return $alert->updated_at->diffInSeconds(now()) < 300;
+        // Anti-spam: usar tiempo_alerta como referencia de última notificación.
+        // tiempo_alerta se actualiza con now() cada vez que se envía Telegram exitosamente.
+        $lastNotify = $alert->tiempo_alerta;
+        if (!$lastNotify) {
+            return false;
+        }
+
+        // No reenviar si se notificó hace menos de 20 minutos
+        return $lastNotify->diffInSeconds(now()) < 1200; // 20 min = 1200 seg
     }
 
     /**
@@ -108,7 +124,6 @@ class AlertService
     {
         $lote = $alert->ubicacion->planta->nombre ?? 'N/A';
         $loc  = $alert->ubicacion->nombre ?? 'N/A';
-
         $severity = $this->normalizeSeverity($alert->severidad ?? $alert->nivel);
 
         $emoji = match ($severity) {
@@ -135,7 +150,7 @@ class AlertService
             . "• ΔCE: {$deltaCe} dS/m\n"
             . "───────────────────\n"
             . "📝 <b>Detalle:</b>\n"
-            . "<i>" . ($alert->descripcion ?? 'Detección automática del sistema') . "</i>\n\n"
+            . "<i>" . ($alert->descripcion ?? 'Detección automática del sistema') . "</i>\n"
             . "📅 " . now()->format('d/m/Y H:i:s');
     }
 
@@ -145,7 +160,6 @@ class AlertService
     private function buildButtons(Alerta $alert): array
     {
         $url = rtrim(config('app.url'), '/');
-
         return [
             [
                 [

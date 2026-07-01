@@ -199,15 +199,17 @@
         border-radius: 24px;
         width: 100%;
         max-width: 520px;
-        max-height: 90vh; /* Límite de altura para que no desborde la pantalla */
+        max-height: 90vh;
         overflow-y: auto;
-        /* Permite scroll interno si el contenido es muy largo */
         padding: 2rem;
         box-shadow: 0 25px 60px rgba(0,0,0,0.25);
         animation: evalPop 0.25s ease-out;
     }
 
-    /* Ajuste para pantallas pequeñas */
+    .eval-box.modal-lg {
+        max-width: 800px;
+    }
+
     @media (max-width: 640px) {
         .eval-box {
             padding: 1.5rem;
@@ -229,10 +231,8 @@
         padding-bottom: 1rem;
         border-bottom: 2px solid #f1f5f9;
         position: sticky;
-        /* Fija el encabezado en la parte superior */
         top: 0;
         background: #fff;
-        /* Oculta el texto que pasa por debajo al hacer scroll */
         z-index: 10;
     }
     .eval-header h3 {
@@ -270,6 +270,18 @@
         left: 0; right: 0; bottom: 0;
         border-radius: 50%; background: inherit; animation: pulse-ring 1.5s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
     }
+
+    /* Botones clickeables en tabla */
+    .clickable-cell {
+        cursor: pointer;
+        transition: all 0.2s;
+        border-radius: 6px;
+        padding: 2px 6px;
+    }
+    .clickable-cell:hover {
+        background: rgba(139, 92, 246, 0.1);
+        transform: scale(1.05);
+    }
 </style>
 
 <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
@@ -277,7 +289,9 @@
     <div class="page-header">
         <div>
             <h1>Tiempo Promedio de Detección</h1>
-            <p>3er Indicador</p>
+            <div class="mt-2 text-[10px] font-bold text-slate-400 italic">
+                * Tiempo promedio de detección de eventos de Lixiviación.
+            </div>
         </div>
         <div style="display:flex; gap: 0.75rem;">
             <a href="{{ route('detection_time.export', ['location_id' => $location_id, 'mode' => $mode, 'filter' => $filter]) }}" class="btn btn-light shadow-sm" style="border-radius:10px; font-weight:600; font-size:0.85rem; text-decoration: none; display: flex; align-items: center; justify-content: center; padding: 0.5rem 1rem;">
@@ -533,10 +547,7 @@
                     @if(count($detectionRecords->items()) > 0)
                         @foreach($detectionRecords->items() as $index => $day)
                             @php
-                                // N Tiempo viene de tiempos_deteccion (cantidad_eventos)
                                 $nTiempo = $day->cantidad_eventos;
-                                
-                                // Calcular Ti y Tf aproximados
                                 $tiHora = $day->tiempo_inicial ? $day->tiempo_inicial->format('H:i:s') : '08:00:00';
                                 $tfHora = $day->tiempo_final ? $day->tiempo_final->format('H:i:s') : '08:00:00';
                             @endphp
@@ -564,20 +575,42 @@
                                     <div style="font-size: 0.65rem; color: #9ca3af;">Tf</div>
                                 </td>
                                 <td style="text-align: center;">
-                                    <div style="font-weight: 900; color: #7c3aed; font-size: 1.25rem; line-height: 1;">
-                                        {{ $nTiempo }}
-                                    </div>
-                                    <div style="font-size: 0.65rem; color: #64748b; font-weight: 700; margin-top: 2px;">
-                                        Eventos medibles
-                                    </div>
+                                    @if($mode === 'iot' && isset($alertasPorDia[$day->id]) && count($alertasPorDia[$day->id]) > 0)
+                                        <div class="clickable-cell" onclick='openAlertDetailModal({{ $day->id }}, "{{ \Carbon\Carbon::parse($day->fecha)->format("d/m/Y") }}", {{ $day->cantidad_eventos }}, {{ round($day->tiempo_promedio_segundos, 2) }}, @json($alertasPorDia[$day->id] ?? []))'>
+                                            <div style="font-weight: 900; color: #7c3aed; font-size: 1.25rem; line-height: 1;">
+                                                {{ $nTiempo }}
+                                            </div>
+                                            <div style="font-size: 0.65rem; color: #64748b; font-weight: 700; margin-top: 2px;">
+                                                📊 Ver detalle
+                                            </div>
+                                        </div>
+                                    @else
+                                        <div style="font-weight: 900; color: #7c3aed; font-size: 1.25rem; line-height: 1;">
+                                            {{ $nTiempo }}
+                                        </div>
+                                        <div style="font-size: 0.65rem; color: #64748b; font-weight: 700; margin-top: 2px;">
+                                            Eventos medibles
+                                        </div>
+                                    @endif
                                 </td>
                                 <td>
-                                    <div style="font-family: monospace; font-weight: 900; color: #059669; font-size: 1.1rem;">
-                                        {{ number_format($day->tiempo_promedio_segundos, 2) }}s
-                                    </div>
-                                    <div style="font-size: 0.7rem; color: #9ca3af; font-weight: 600;">
-                                        (~{{ round($day->tiempo_promedio_segundos / 60, 2) }} min)
-                                    </div>
+                                    @if($mode === 'iot' && isset($alertasPorDia[$day->id]) && count($alertasPorDia[$day->id]) > 0)
+                                        <div class="clickable-cell" onclick='openAlertDetailModal({{ $day->id }}, "{{ \Carbon\Carbon::parse($day->fecha)->format("d/m/Y") }}", {{ $day->cantidad_eventos }}, {{ round($day->tiempo_promedio_segundos, 2) }}, @json($alertasPorDia[$day->id] ?? []))'>
+                                            <div style="font-family: monospace; font-weight: 900; color: #059669; font-size: 1.1rem;">
+                                                {{ number_format($day->tiempo_promedio_segundos, 2) }}s
+                                            </div>
+                                            <div style="font-size: 0.7rem; color: #9ca3af; font-weight: 600;">
+                                                (~{{ round($day->tiempo_promedio_segundos / 60, 2) }} min)
+                                            </div>
+                                        </div>
+                                    @else
+                                        <div style="font-family: monospace; font-weight: 900; color: #059669; font-size: 1.1rem;">
+                                            {{ number_format($day->tiempo_promedio_segundos, 2) }}s
+                                        </div>
+                                        <div style="font-size: 0.7rem; color: #9ca3af; font-weight: 600;">
+                                            (~{{ round($day->tiempo_promedio_segundos / 60, 2) }} min)
+                                        </div>
+                                    @endif
                                 </td>
                                 <td>
                                     <div style="font-weight: 600; color: #374151; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;">
@@ -615,8 +648,12 @@
                     @endif
                 </tbody>
             </table>
-        </div> </div> </div> {{-- ═══════════════════════════════════════════════════════════════════ --}}
-{{-- 🆕 MODAL: REGISTRO MANUAL                                           --}}
+        </div>
+    </div>
+</div>
+
+{{-- ═══════════════════════════════════════════════════════════════════ --}}
+{{-- 🆕 MODAL: REGISTRO MANUAL                                          --}}
 {{-- ═══════════════════════════════════════════════════════════════════ --}}
 <div id="manualModal" class="eval-overlay">
     <div class="eval-box">
@@ -692,6 +729,60 @@
     </div>
 </div>
 
+{{-- ═══════════════════════════════════════════════════════════════════ --}}
+{{-- 🆕 MODAL: DETALLE DE ALERTAS POR DÍA (SUSTENTO ACADÉMICO)         --}}
+{{-- ═══════════════════════════════════════════════════════════════════ --}}
+<div id="alertDetailModal" class="eval-overlay">
+    <div class="eval-box modal-lg">
+        <div class="eval-header">
+            <h3>🔍 Detalle de Alertas — <span id="modalFecha" style="color:#7c3aed;"></span></h3>
+            <button type="button" class="eval-close" onclick="closeAlertDetailModal()">✕</button>
+        </div>
+
+        {{-- Resumen del día --}}
+        <div class="p-4 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl mb-4">
+            <div class="text-xs font-black uppercase text-purple-600 tracking-widest mb-3">📊 Resumen del Día</div>
+            <div class="grid grid-cols-3 gap-4">
+                <div class="text-center">
+                    <div class="text-2xl font-black text-purple-700" id="modalTotalAlertas">0</div>
+                    <div class="text-xs font-bold text-slate-600">Total Alertas</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-black text-emerald-600" id="modalEventosMedibles">0</div>
+                    <div class="text-xs font-bold text-slate-600">VP Medibles</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-black text-amber-600" id="modalTiempoPromedio">0s</div>
+                    <div class="text-xs font-bold text-slate-600">TPD Promedio</div>
+                </div>
+            </div>
+        </div>
+
+        {{-- Justificación académica --}}
+        <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div class="text-xs font-bold text-blue-700 mb-1">📚 Justificación Académica:</div>
+            <p class="text-xs text-slate-700 leading-relaxed">
+                Solo se consideran <strong>"Eventos Medibles"</strong> las alertas evaluadas como 
+                <strong>VP (Verdadero Positivo)</strong> donde los sensores registraron tanto 
+                <strong>Ti</strong> como <strong>Tf</strong>. Las alertas <strong>FP</strong> no tienen tiempo medible (no hubo evento real).
+                <br><br>
+                <strong>Fórmula:</strong> <code style="background:#fff; padding:2px 6px; border-radius:4px;">TPD = Σ(Tf - Ti) / N_vp_medibles</code>
+            </p>
+        </div>
+
+        {{-- Lista de alertas --}}
+        <div id="alertDetailContent" style="max-height: 400px; overflow-y: auto;">
+            <!-- Se carga dinámicamente -->
+        </div>
+
+        <div class="mt-6 flex justify-end">
+            <button type="button" onclick="closeAlertDetailModal()" class="px-6 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-xl font-bold shadow-sm">
+                Cerrar
+            </button>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @push('scripts')
@@ -705,7 +796,97 @@ function closeManualModal() {
     document.getElementById('manualModal').classList.remove('active');
 }
 
-// ✅ CORREGIDO: Sincronización con localStorage respetando "all"
+/* ========== MODAL DE DETALLE DE ALERTAS ========== */
+function openAlertDetailModal(recordId, fecha, eventosMedibles, tiempoPromedio, alertas) {
+    const modal = document.getElementById('alertDetailModal');
+    
+    // Actualizar resumen
+    document.getElementById('modalFecha').textContent = fecha;
+    document.getElementById('modalTotalAlertas').textContent = alertas.length;
+    document.getElementById('modalEventosMedibles').textContent = eventosMedibles;
+    document.getElementById('modalTiempoPromedio').textContent = tiempoPromedio + 's';
+    
+    // Generar lista de alertas
+    const content = document.getElementById('alertDetailContent');
+    let html = '<div class="space-y-2">';
+    
+    if (alertas.length === 0) {
+        html += '<div class="text-center py-8 text-slate-500"><i class="fas fa-inbox text-3xl mb-2"></i><p>No hay alertas registradas.</p></div>';
+    } else {
+        alertas.forEach((alerta, index) => {
+            const numero = index + 1;
+            const esVP = alerta.es_vp;
+            const tieneTiempo = alerta.tiene_tiempo;
+            
+            let badgeClass = '';
+            let badgeText = '';
+            let icon = '';
+            let bgColor = '';
+            
+            if (esVP && tieneTiempo) {
+                badgeClass = 'bg-emerald-100 text-emerald-700 border-emerald-300';
+                badgeText = 'VP ✅';
+                icon = 'fa-check-circle';
+                bgColor = 'bg-emerald-50 border-emerald-200';
+            } else if (esVP && !tieneTiempo) {
+                badgeClass = 'bg-amber-100 text-amber-700 border-amber-300';
+                badgeText = 'VP ⚠️';
+                icon = 'fa-exclamation-triangle';
+                bgColor = 'bg-amber-50 border-amber-200';
+            } else if (!esVP) {
+                badgeClass = 'bg-red-100 text-red-700 border-red-300';
+                badgeText = 'FP ❌';
+                icon = 'fa-times-circle';
+                bgColor = 'bg-red-50 border-red-200';
+            } else {
+                badgeClass = 'bg-slate-100 text-slate-700 border-slate-300';
+                badgeText = 'Sin evaluar';
+                icon = 'fa-question-circle';
+                bgColor = 'bg-slate-50 border-slate-200';
+            }
+            
+            html += `
+                <div class="p-3 border-2 ${bgColor} rounded-lg transition-all">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="px-3 py-1 ${badgeClass} border rounded-full text-xs font-black">
+                                <i class="fas ${icon}"></i> ALERTA #${numero} → ${badgeText}
+                            </span>
+                            <span class="text-xs font-bold text-slate-500">ID: ${alerta.id}</span>
+                        </div>
+                        ${tieneTiempo ? `<div class="text-lg font-black text-purple-600 font-mono">${alerta.diferencia_formateada}</div>` : ''}
+                    </div>
+                    <div class="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                            <div class="text-xs font-bold text-slate-500 uppercase">Ti (Detección)</div>
+                            <div class="font-mono font-bold text-blue-600">${alerta.tiempo_alerta}</div>
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-slate-500 uppercase">Tf (Resolución)</div>
+                            <div class="font-mono font-bold text-green-600">${alerta.tiempo_riesgo}</div>
+                        </div>
+                    </div>
+                    ${!tieneTiempo ? `
+                        <div class="mt-2 p-2 bg-white/60 border border-slate-200 rounded text-xs text-slate-600">
+                            <i class="fas fa-info-circle"></i> 
+                            ${esVP ? 'Sin medición completa (sensor falló / evento nocturno / datos incompletos)' : 'Falsa alarma - No hubo evento real de lixiviación'}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        });
+    }
+    
+    html += '</div>';
+    content.innerHTML = html;
+    modal.classList.add('active');
+}
+
+function closeAlertDetailModal() {
+    document.getElementById('alertDetailModal').classList.remove('active');
+}
+
+/* ========== SINCRONIZACIÓN Y UTILIDADES ========== */
 (function syncRealtimeSelection() {
     const mode = '{{ $mode }}';
     if (mode !== 'iot') return;
@@ -731,7 +912,6 @@ function closeManualModal() {
     }
 })();
 
-// ✅ NUEVO: Guardar selección en localStorage cuando cambia
 document.addEventListener('DOMContentLoaded', function() {
     const selector = document.getElementById('location-selector');
     if (selector) {
